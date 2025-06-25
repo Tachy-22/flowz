@@ -9,7 +9,6 @@ import ReactFlow, {
   NodeChange,
   EdgeChange,
   ReactFlowProvider,
-
   Background,
   Controls,
   MiniMap,
@@ -138,7 +137,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     setActiveTool,
   } = useDiagramStore();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { project } = useReactFlow();
+  const { project, fitView } = useReactFlow();
   // Force re-render for rectangle tool preview updates
   const [, forceUpdate] = useState({});
   const forceRerender = useCallback(() => forceUpdate({}), []);
@@ -177,8 +176,8 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       console.log("✅ Initial React Flow setup complete");
     }
     // Only run once on mount, don't include state dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // eslint-disable-line react-hooks/exhaustive-deps  
   //  // Sync from Zustand to React Flow when diagrams are loaded
   const prevNodesLength = useRef(nodes.length);
   const prevEdgesLength = useRef(edges.length);
@@ -198,10 +197,17 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       (nodes.length === 0 && prevNodesLength.current > 0); // Diagram reset
 
     const shouldSync = diagramIdChanged || isSignificantChange;
-
     if (shouldSync) {
       console.log("🔄 Syncing loaded diagram from Zustand to React Flow");
       console.log("📊 Zustand nodes:", nodes.length, "edges:", edges.length);
+      console.log(
+        "📍 Node positions:",
+        nodes.map((n) => ({
+          id: n.id,
+          position: n.position,
+          label: n.data.label,
+        }))
+      );
       console.log(
         "📋 Diagram ID changed:",
         diagramIdChanged,
@@ -233,10 +239,19 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         type: edge.type,
         data: edge.data,
       }));
-
       setFlowNodes(mappedNodes);
       setFlowEdges(mappedEdges);
       console.log("✅ Diagram loaded into React Flow");
+
+      // Fit the view to show all nodes after a short delay
+      setTimeout(() => {
+        try {
+          fitView({ duration: 200, padding: 0.1 });
+          console.log("🔍 Fitted view to show all nodes");
+        } catch (error) {
+          console.log("⚠️ fitView failed:", error);
+        }
+      }, 100);
 
       // Update tracking refs
       lastDiagramId.current = diagramId;

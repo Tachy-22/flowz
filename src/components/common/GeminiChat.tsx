@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Send, Bot, User } from "lucide-react";
+import { Loader2, Send, Bot, User, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -12,6 +12,11 @@ import {
   ChatHistory,
   GeminiChat as Chat,
 } from "@/integrations/gemini";
+import { diagramAgent, DiagramCreationRequest } from "@/integrations/ai";
+import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
+import { useUserStore } from "@/integrations/zustand";
+import { diagramService } from "@/integrations/firebase/diagrams";
+import { Node, Edge } from "@/types/diagram";
 
 interface Message {
   id: string;
@@ -19,6 +24,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  hasDiagramData?: boolean;
 }
 
 const GeminiChat: React.FC = () => {
@@ -35,7 +41,20 @@ const GeminiChat: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [chat, setChat] = useState<Chat | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null); // Get diagram state and functions
+  const {
+    nodes,
+    edges,
+    diagramTitle,
+    diagramId,
+    setNodes,
+    setEdges,
+    setDiagramId,
+    setDiagramTitle,
+    setLoading: setDiagramLoading,
+    loadDiagram,
+  } = useDiagramStore();
+  const { user } = useUserStore();
   // Initialize chat on component mount
   useEffect(() => {
     const initializeChat = async () => {
@@ -84,12 +103,15 @@ const GeminiChat: React.FC = () => {
     }
   }, [messages]);
   const handleSendMessage = async () => {
-    if (!input.trim() || isLoading || !chat) return;
+    if (!input.trim() || isLoading) return;
 
-    console.log("🚀 Starting message send process");
+    console.log("🚀 Starting AI diagram creation process");
     console.log("Input:", input.trim());
-    console.log("Chat instance exists:", !!chat);
-    console.log("Is loading:", isLoading);
+    console.log("Current diagram context:", {
+      nodes: nodes.length,
+      edges: edges.length,
+      title: diagramTitle,
+    });
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -111,50 +133,49 @@ const GeminiChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const messageText = userMessage.content;
-      let fullResponse = "";
-      let chunkCount = 0;
+      // Prepare diagram creation request with current context
+      const request: DiagramCreationRequest = {
+        prompt: userMessage.content,
+        currentDiagram:
+          nodes.length > 0 || edges.length > 0
+            ? {
+                nodes,
+                edges,
+                title: diagramTitle,
+              }
+            : undefined,
+      };
 
-      console.log("📤 Starting to stream message:", messageText);
+      console.log("📤 Sending request to diagram agent");
+      const response = await diagramAgent.processRequest(request);
 
-      // Stream the response
-      for await (const chunk of sendMessageStream(chat, messageText)) {
-        chunkCount++;
-        fullResponse = chunk;
-        console.log(
-          `📥 Received chunk ${chunkCount}:`,
-          chunk.substring(0, 50) + "..."
-        );
+      console.log("📥 Agent response received:", {
+        success: response.success,
+        hasDiagramData: !!response.diagramData,
+        chatLength: response.chatResponse.length,
+      });
 
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMessage.id
-              ? { ...msg, content: chunk, isStreaming: true }
-              : msg
-          )
-        );
-
-        // Small delay to make streaming visible
-        await new Promise((resolve) => setTimeout(resolve, 30));
-      }
-
-      console.log("✅ Streaming completed. Total chunks:", chunkCount);
-      console.log("Final response length:", fullResponse.length);
-
-      // Mark as complete
+      // Update the message with the chat response
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMessage.id
-            ? { ...msg, content: fullResponse, isStreaming: false }
+            ? {
+                ...msg,
+                content: response.chatResponse,
+                isStreaming: false,
+                hasDiagramData: !!response.diagramData,
+              }
             : msg
         )
       );
+
+      // If diagram data was generated, create/update the diagram
+      if (response.diagramData && user) {
+        console.log("🎨 Creating/updating diagram with AI-generated data");
+        await createDiagramFromAI(response.diagramData);
+      }
     } catch (error) {
-      console.error("❌ Error in handleSendMessage:");
-      console.error("Error type:", typeof error);
-      console.error("Error message:", (error as Error)?.message);
-      console.error("Error stack:", (error as Error)?.stack);
-      console.error("Full error object:", error);
+      console.error("❌ Error in AI diagram creation:", error);
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -171,9 +192,65 @@ const GeminiChat: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
-      console.log("🏁 Message send process completed");
+      console.log("🏁 AI diagram creation process completed");
       // Focus back to input
       setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+  // Create or update diagram with AI-generated data
+  const createDiagramFromAI = async (diagramData: {
+    nodes: Node[];
+    edges: Edge[];
+    title: string;
+    description?: string;
+  }) => {
+    if (!user || !diagramData) return;
+    try {
+      setDiagramLoading(true);
+
+      console.log(
+        "🎨 Loading AI-generated diagram with coordinates:",
+        diagramData.nodes.map((n) => ({ id: n.id, position: n.position }))
+      );
+
+      // Update the diagram state with AI-generated data using loadDiagram
+      loadDiagram(
+        diagramData.nodes,
+        diagramData.edges,
+        diagramData.title,
+        diagramId || undefined
+      );
+
+      // Save to Firebase
+      if (diagramId) {
+        // Update existing diagram
+        console.log("💾 Updating existing diagram with AI data");
+        await diagramService.updateDiagramContent(
+          diagramId,
+          diagramData.nodes,
+          diagramData.edges
+        );
+        await diagramService.updateDiagram(diagramId, {
+          title: diagramData.title,
+          description: diagramData.description,
+        });
+      } else {
+        // Create new diagram
+        console.log("🆕 Creating new diagram with AI data");
+        const newDiagramId = await diagramService.createDiagram(user.uid, {
+          title: diagramData.title,
+          description: diagramData.description,
+          nodes: diagramData.nodes,
+          edges: diagramData.edges,
+        });
+        setDiagramId(newDiagramId);
+      }
+
+      console.log("✅ Diagram successfully created/updated with AI data");
+    } catch (error) {
+      console.error("❌ Failed to save AI-generated diagram:", error);
+    } finally {
+      setDiagramLoading(false);
     }
   };
 
@@ -258,12 +335,19 @@ const GeminiChat: React.FC = () => {
                 >
                   {" "}
                   <div
-                    className={`inline-block p-3 rounded-lg max-w-[80%] ${
+                    className={`inline-block p-3 rounded-lg max-w-[80%] relative ${
                       message.role === "user"
                         ? "bg-indigo-600 text-white"
                         : "bg-gray-100 text-gray-900"
                     }`}
                   >
+                    {/* Diagram indicator for AI messages with diagram data */}
+                    {message.role === "model" && message.hasDiagramData && (
+                      <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
+                        <Sparkles className="w-3 h-3" />
+                      </div>
+                    )}
+
                     {message.role === "user" ? (
                       <p className="text-sm whitespace-pre-wrap">
                         {message.content}
@@ -376,7 +460,7 @@ const GeminiChat: React.FC = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask me to help you create a flow diagram..."
+            placeholder="Ask me to create or modify your diagram... (e.g., 'Create a simple rectangle', 'Add a process box')"
             className="flex-1"
             disabled={isLoading}
           />
