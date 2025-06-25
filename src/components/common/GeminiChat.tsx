@@ -72,11 +72,15 @@ const GeminiChat: React.FC = () => {
 
     initializeChat();
   }, []);
-
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+      const viewport = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
   }, [messages]);
   const handleSendMessage = async () => {
@@ -218,13 +222,12 @@ const GeminiChat: React.FC = () => {
         >
           Clear
         </Button>
-      </div>
-
+      </div>{" "}
       {/* Messages Area */}
-      <div className="flex-1 flex flex-col p-4 space-y-4">
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-          <div className="space-y-4">
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Messages ScrollArea */}
+        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
+          <div className="space-y-4 py-4">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -363,11 +366,11 @@ const GeminiChat: React.FC = () => {
                 </div>
               </div>
             ))}
-          </div>
+          </div>{" "}
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="flex items-center space-x-2 pt-2 border-t">
+        <div className="flex items-center space-x-2 p-4 border-t bg-white">
           <Input
             ref={inputRef}
             value={input}

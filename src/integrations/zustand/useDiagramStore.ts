@@ -77,6 +77,12 @@ interface DiagramState {
   setDiagramTitle: (title: string) => void;
   setLoading: (loading: boolean) => void;
   resetDiagram: () => void;
+  loadDiagram: (
+    nodes: Node[],
+    edges: Edge[],
+    title?: string,
+    id?: string
+  ) => void;
 
   // Export data
   getDiagramData: () => { nodes: Node[]; edges: Edge[] };
@@ -251,6 +257,21 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       connectionStartNode: null,
       diagramTitle: "Untitled Diagram",
     }),
+
+  loadDiagram: (nodes, edges, title = "Untitled Diagram", id = undefined) => {
+    set({
+      nodes,
+      edges,
+      diagramTitle: title,
+      diagramId: id,
+      selectedNodeId: null,
+      viewport: initialViewport,
+      history: [],
+      currentHistoryIndex: -1,
+      isConnecting: false,
+      connectionStartNode: null,
+    });
+  },
 
   getDiagramData: () => {
     const state = get();

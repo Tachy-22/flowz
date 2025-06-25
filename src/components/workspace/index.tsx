@@ -1,8 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useUserStore } from "@/integrations/zustand";
+import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { useRouter } from "next/navigation";
 import { authService } from "@/integrations/firebase/auth";
+import { diagramService } from "@/integrations/firebase/diagrams";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import {
@@ -19,6 +21,8 @@ const WorkspaceIndex: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isToolsSidebarOpen, setIsToolsSidebarOpen] = useState(true);
   const { user, resetUserState } = useUserStore();
+  const { nodes, edges, diagramId, setDiagramId, setLoading, diagramTitle } =
+    useDiagramStore();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -31,8 +35,72 @@ const WorkspaceIndex: React.FC = () => {
     }
   };
 
+  // Save diagram to Firestore
+  const handleSave = useCallback(async () => {
+    if (!user) {
+      console.error("User not authenticated");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (diagramId) {
+        // Update existing diagram
+        await diagramService.updateDiagramContent(diagramId, nodes, edges);
+        console.log("✅ Diagram updated successfully!");
+      } else {
+        // Create new diagram
+        const newDiagramId = await diagramService.createDiagram(user.uid, {
+          title: diagramTitle || "My Diagram",
+          nodes,
+          edges,
+        });
+        setDiagramId(newDiagramId);
+        console.log("✅ New diagram created successfully!");
+      }
+    } catch (error) {
+      console.error("❌ Failed to save diagram:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, diagramId, nodes, edges, diagramTitle, setDiagramId, setLoading]);
+
+  // Update diagram title and auto-save
+  const handleUpdateTitle = useCallback(
+    async (newTitle: string) => {
+      if (!user) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        if (diagramId) {
+          // Update existing diagram title
+          await diagramService.updateDiagram(diagramId, { title: newTitle });
+          console.log("✅ Diagram title updated successfully!");
+        } else {
+          // Create new diagram with the title
+          const newDiagramId = await diagramService.createDiagram(user.uid, {
+            title: newTitle,
+            nodes,
+            edges,
+          });
+          setDiagramId(newDiagramId);
+          console.log("✅ New diagram created with title!");
+        }
+      } catch (error) {
+        console.error("❌ Failed to update diagram title:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, diagramId, nodes, edges, setDiagramId, setLoading]
+  );
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {" "}
       {/* Top Toolbar */}
       <TopToolbar
         user={user}
@@ -41,6 +109,8 @@ const WorkspaceIndex: React.FC = () => {
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
         isToolsSidebarOpen={isToolsSidebarOpen}
         isChatOpen={isChatOpen}
+        onSave={handleSave}
+        onUpdateTitle={handleUpdateTitle}
       />{" "}
       {/* Main Workspace */}
       <div className="flex-1 overflow-hidden">
