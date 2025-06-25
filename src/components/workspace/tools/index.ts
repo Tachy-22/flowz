@@ -25,6 +25,7 @@ export {
   circleTool,
   diamondTool,
   triangleTool,
+  textTool,
   getShapeTool,
   type ShapeType,
   type ShapeData,

@@ -15,7 +15,6 @@ import {
   Circle,
   Triangle,
   Diamond,
-  ArrowRight,
   Type,
   Image,
   Pen,
@@ -61,7 +60,7 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
       const diagrams = await diagramService.getUserDiagrams(user.uid, {
         orderBy: "updatedAt",
         orderDirection: "desc",
-        limit: 10,
+        limit: 100,
       });
       console.log("📊 Found diagrams:", diagrams);
       setRecentDiagrams(diagrams);
@@ -147,7 +146,10 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
         setActiveTool("arrow");
         break;
       case "Text":
+        console.log("📝 Text tool selected, triggering add shape");
         setActiveTool("text");
+        triggerAddRectangle(); // This will trigger shape drawing mode
+        console.log("✅ Text tool activated");
         break;
       default:
         setActiveTool("select");
@@ -166,7 +168,6 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
     { icon: Diamond, label: "Diamond", category: "shapes" },
   ];
 
- 
   const otherTools = [
     { icon: Type, label: "Text", category: "other" },
     { icon: Pen, label: "Draw", category: "other" },

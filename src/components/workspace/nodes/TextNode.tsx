@@ -1,22 +1,26 @@
 "use client";
-import React, { useCallback, useState } from "react";
-import { useReactFlow, Handle, Position } from "reactflow";
+import React, { useCallback, useState, useRef, useEffect } from "react";
+import { Handle, Position, useReactFlow } from "reactflow";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { Button } from "@/components/ui/button";
 import { Trash2, Edit3 } from "lucide-react";
 
-// Custom Rectangle Node Component
-interface RectangleNodeProps {
+// Text Node Component
+interface TextNodeProps {
   id: string;
   data: {
     label?: string;
+    text?: string;
     width?: number;
     height?: number;
+    fontSize?: number;
+    fontWeight?: string;
+    textAlign?: "left" | "center" | "right";
   };
   selected?: boolean;
 }
 
-const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
+const TextNode: React.FC<TextNodeProps> = ({ id, data, selected }) => {
   const setSelectedNodeId = useDiagramStore((state) => state.setSelectedNodeId);
   const {
     activeTool,
@@ -27,10 +31,10 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
     edges,
   } = useDiagramStore();
 
-  const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(data.label || "Rectangle");
-  const inputRef = React.useRef<HTMLTextAreaElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [text, setText] = useState(data.text || data.label || "Enter text...");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Get React Flow functions from context
   const { setNodes, setEdges } = useReactFlow();
@@ -46,7 +50,7 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
       );
       setSelectedNodeId(null);
 
-      console.log("🗑️ Deleted rectangle node:", id);
+      console.log("🗑️ Deleted text node:", id);
     },
     [setNodes, setEdges, setSelectedNodeId, id]
   );
@@ -76,7 +80,7 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
     [activeTool, isConnecting, startConnection, finishConnection, id]
   );
 
-  // Handle node click for connection tool
+  // Handle node click for editing
   const handleNodeClick = useCallback(
     (e: React.MouseEvent) => {
       if (activeTool === "connection") {
@@ -91,87 +95,157 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
     [activeTool, isConnecting, startConnection, finishConnection, id]
   );
 
-  // Check if a handle has connections
-  const hasConnections = useCallback(
-    (handleId: string) => {
-      return edges.some(
-        (edge) =>
-          (edge.source === id && edge.sourceHandle === handleId) ||
-          (edge.target === id && edge.targetHandle === handleId)
-      );
+  // Handle double click to start editing
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (activeTool === "select" || activeTool === "text") {
+        setIsEditing(true);
+      }
     },
-    [edges, id]
+    [activeTool]
   );
 
-  // Determine if handles should be visible
-  const shouldShowHandles =
-    activeTool === "connection" ||
-    isConnecting ||
-    isHovered ||
-    selected ||
-    ["top", "right", "bottom", "left"].some((handleId) =>
-      hasConnections(handleId)
-    );
+  // Handle edit button click
+  const handleEdit = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+  }, []);
 
-  // Focus input when editing starts
-  React.useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      try {
-        if (typeof inputRef.current.select === "function") {
-          inputRef.current.select();
-        }
-      } catch {
-        // Ignore if select is not available
-      }
+  // Focus textarea when editing starts
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
     }
   }, [isEditing]);
 
-  // Save label to state
+  // Handle text change and save
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setText(e.target.value);
+    },
+    []
+  );
+
+  // Handle save (when pressing Enter or losing focus)
   const handleSave = useCallback(() => {
     setIsEditing(false);
+
+    // Update the node data in React Flow
     setNodes((nodes) =>
       nodes.map((node) =>
-        node.id === id ? { ...node, data: { ...node.data, label } } : node
+        node.id === id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                text: text,
+                label: text,
+              },
+            }
+          : node
       )
     );
-  }, [id, label, setNodes]);
 
-  // Handle key press in input
+    console.log("💾 Saved text for node:", id, text);
+  }, [id, text, setNodes]);
+
+  // Handle key press in textarea
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsEditing(false);
-        setLabel(data.label || "Rectangle");
-      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey || !e.shiftKey)) {
+        setText(data.text || data.label || "Enter text...");
+      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         handleSave();
       }
     },
-    [data.label, handleSave]
+    [data.text, data.label, handleSave]
   );
+
+  // Check if handles should be visible
+  const hasConnections = (handleId: string) => {
+    return edges.some(
+      (edge) =>
+        (edge.source === id && edge.sourceHandle === handleId) ||
+        (edge.target === id && edge.targetHandle === handleId)
+    );
+  };
+
+  const shouldShowHandles =
+    activeTool === "connection" ||
+    isHovered ||
+    selected ||
+    edges.some((edge) => edge.source === id || edge.target === id);
+
+  const width = data.width || 200;
+  const height = data.height || 100;
+  const fontSize = data.fontSize || 14;
+  const fontWeight = data.fontWeight || "normal";
+  const textAlign = data.textAlign || "left";
 
   return (
     <div
-      className={`bg-blue-100 border-2 rounded-lg p-4 relative group cursor-move ${
-        selected ? "border-blue-500 shadow-lg" : "border-blue-300"
-      } ${
-        activeTool === "connection"
-          ? "hover:border-green-500 hover:shadow-green-200"
-          : ""
+      className={`relative group cursor-move flex items-center justify-center ${
+        activeTool === "connection" ? "hover:shadow-purple-200" : ""
       }`}
       style={{
-        width: data.width || 120,
-        height: data.height || 80,
-        minWidth: 80,
-        minHeight: 60,
+        width: width,
+        height: height,
+        minWidth: 100,
+        minHeight: 40,
       }}
       onClick={handleNodeClick}
-      onDoubleClick={() => setIsEditing(true)}
+      onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {" "}
-      {/* Connection Handles - Only visible when needed */}
+      {/* Text Container */}
+      <div
+        className={`w-full h-full p-3 border-2 border-dashed rounded-lg ${
+          selected
+            ? "border-purple-500 bg-purple-50"
+            : isHovered
+            ? "border-purple-300 bg-purple-25"
+            : "border-gray-300 bg-transparent"
+        } ${isEditing ? "border-purple-500 bg-white" : ""}`}
+        style={{
+          fontSize: `${fontSize}px`,
+          fontWeight: fontWeight,
+          textAlign: textAlign,
+        }}
+      >
+        {isEditing ? (
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleTextChange}
+            onBlur={handleSave}
+            onKeyDown={handleKeyPress}
+            className="w-full h-full resize-none border-none outline-none bg-transparent p-0"
+            style={{
+              fontSize: `${fontSize}px`,
+              fontWeight: fontWeight,
+              textAlign: textAlign,
+            }}
+            placeholder="Enter your text..."
+          />
+        ) : (
+          <div
+            className="w-full h-full overflow-hidden whitespace-pre-wrap break-words text-gray-800"
+            style={{
+              fontSize: `${fontSize}px`,
+              fontWeight: fontWeight,
+              textAlign: textAlign,
+            }}
+          >
+            {text || "Enter text..."}
+          </div>
+        )}
+      </div>
+
+      {/* Connection Handles */}
       {shouldShowHandles &&
         ["top", "right", "bottom", "left"].map((handleId) => {
           const position =
@@ -192,9 +266,6 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
               ? { bottom: -6 }
               : { left: -6 };
 
-          // Determine handle type dynamically:
-          // - If we're connecting and this is NOT the source node, it should be a target
-          // - If we're not connecting or this IS the source node, it should be a source
           const handleType =
             isConnecting && connectionStartNode && connectionStartNode !== id
               ? "target"
@@ -208,12 +279,12 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
               type={handleType}
               position={position}
               id={handleId}
-              className={`!w-3 !h-3 !border-2 !border-white transition-all duration-200 ${
-                isConnected
-                  ? "!bg-green-500"
-                  : activeTool === "connection"
-                  ? "!bg-blue-500 hover:!bg-green-500 hover:!w-4 hover:!h-4"
-                  : "!bg-blue-500"
+              className={`!w-3 !h-3 !bg-purple-500 !border-2 !border-white !z-30 transition-all ${
+                activeTool === "connection"
+                  ? "!opacity-100 hover:!bg-purple-600 hover:!w-4 hover:!h-4"
+                  : isConnected
+                  ? "!opacity-100"
+                  : "!opacity-0"
               } ${
                 isConnecting && connectionStartNode !== id
                   ? "!bg-orange-500"
@@ -223,60 +294,42 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
               onClick={(e) => handleConnectionClick(e, handleId)}
               isConnectable={true}
               isValidConnection={(connection) => {
-                // Allow connections between different nodes
                 return connection.source !== connection.target;
               }}
             />
           );
         })}
-      {/* Drag handle - invisible but covers the whole node */}
-      <div className="absolute inset-0 cursor-move" />
-      <div className="text-center text-sm font-medium text-gray-700 relative z-10 pointer-events-auto">
-        {isEditing ? (
-          <textarea
-            ref={inputRef}
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyPress}
-            className="w-full bg-transparent border border-blue-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-blue-500"
-            style={{ textAlign: "center" }}
-          />
-        ) : (
-          label
-        )}
-      </div>
+
       {/* Edit button - show when selected and not editing */}
       {selected && !isEditing && (
         <Button
           variant="outline"
           size="sm"
-          className="absolute -top-2 -left-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsEditing(true);
-          }}
+          className="absolute -top-2 -left-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-30"
+          onClick={handleEdit}
         >
           <Edit3 className="h-3 w-3" />
         </Button>
       )}
+
       {/* Delete button - only show when selected */}
       {selected && (
         <Button
           variant="destructive"
           size="sm"
-          className="absolute -top-2 -right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+          className="absolute -top-2 -right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-30"
           onClick={handleDelete}
         >
           <Trash2 className="h-3 w-3" />
         </Button>
       )}
+
       {/* Resize handles - only show when selected */}
-      {selected && (
+      {selected && !isEditing && (
         <>
           {/* Corner resize handle */}
           <div
-            className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 cursor-se-resize border border-white z-20"
+            className="absolute bottom-0 right-0 w-4 h-4 bg-purple-500 cursor-se-resize border border-white z-30"
             style={{
               borderRadius: "0 0 4px 0",
               transform: "translate(50%, 50%)",
@@ -286,22 +339,10 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
               // Resize logic will be implemented later
             }}
           />
-
-          {/* Right edge resize handle */}
-          <div
-            className="absolute top-1/2 right-0 w-2 h-8 bg-blue-400 cursor-e-resize transform -translate-y-1/2 translate-x-1/2 z-20"
-            style={{ borderRadius: "0 4px 4px 0" }}
-          />
-
-          {/* Bottom edge resize handle */}
-          <div
-            className="absolute bottom-0 left-1/2 w-8 h-2 bg-blue-400 cursor-s-resize transform -translate-x-1/2 translate-y-1/2 z-20"
-            style={{ borderRadius: "0 0 4px 4px" }}
-          />
         </>
       )}
     </div>
   );
 };
 
-export default RectangleNode;
+export default TextNode;
