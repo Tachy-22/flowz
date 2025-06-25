@@ -4,10 +4,13 @@ import { Node, Edge } from "@/types/diagram";
 export type Tool =
   | "select"
   | "rectangle"
+  | "triangle"
   | "circle"
   | "diamond"
   | "arrow"
-  | "text";
+  | "text"
+  | "connection"
+  | "pan";
 
 interface Viewport {
   x: number;
@@ -25,7 +28,9 @@ interface DiagramState {
   // Core diagram data
   nodes: Node[];
   edges: Edge[];
+  // Selection state
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
   viewport: Viewport;
 
   // Tool state
@@ -35,10 +40,11 @@ interface DiagramState {
   // History for undo/redo
   history: HistoryState[];
   currentHistoryIndex: number;
-
   // Connection state
   isConnecting: boolean;
   connectionStartNode: string | null;
+  connectionSourceHandle: string | null;
+  connectionPreview: { x: number; y: number } | null;
 
   // Diagram metadata
   diagramId: string | null;
@@ -54,16 +60,18 @@ interface DiagramState {
   addEdge: (edge: Edge) => void;
   deleteEdge: (id: string) => void;
   setSelectedNodeId: (id: string | null) => void;
+  setSelectedEdgeId: (id: string | null) => void;
   setViewport: (viewport: Viewport) => void;
 
   // Tool actions
   setActiveTool: (tool: Tool) => void;
   triggerAddRectangle: () => void;
   resetAddRectangleFlag: () => void;
-
   // Connection actions
-  startConnection: (nodeId: string) => void;
+  startConnection: (nodeId: string, handle?: string) => void;
+  updateConnectionPreview: (position: { x: number; y: number }) => void;
   endConnection: () => void;
+  finishConnection: (targetNodeId: string, targetHandle?: string) => void;
 
   // History actions
   saveToHistory: () => void;
@@ -99,6 +107,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
+  selectedEdgeId: null,
   viewport: initialViewport,
   activeTool: "select",
   shouldAddRectangle: false,
@@ -106,6 +115,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   currentHistoryIndex: -1,
   isConnecting: false,
   connectionStartNode: null,
+  connectionSourceHandle: null,
+  connectionPreview: null,
   diagramId: null,
   diagramTitle: "Untitled Diagram",
   loading: false,
@@ -162,25 +173,68 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     get().saveToHistory();
   },
   setSelectedNodeId: (id) => set({ selectedNodeId: id }),
+  setSelectedEdgeId: (id) => set({ selectedEdgeId: id }),
   setViewport: (viewport) => set({ viewport }),
 
   // Tool actions
   setActiveTool: (tool) => set({ activeTool: tool }),
   triggerAddRectangle: () => set({ shouldAddRectangle: true }),
   resetAddRectangleFlag: () => set({ shouldAddRectangle: false }),
-
   // Connection actions
-  startConnection: (nodeId) =>
+  startConnection: (nodeId, handle) =>
     set({
       isConnecting: true,
       connectionStartNode: nodeId,
+      connectionSourceHandle: handle || "right",
+      connectionPreview: null,
     }),
+
+  updateConnectionPreview: (position) =>
+    set((state) => ({
+      connectionPreview: state.isConnecting ? position : null,
+    })),
 
   endConnection: () =>
     set({
       isConnecting: false,
       connectionStartNode: null,
+      connectionSourceHandle: null,
+      connectionPreview: null,
     }),
+
+  finishConnection: (targetNodeId, targetHandle) => {
+    const state = get();
+    if (
+      !state.isConnecting ||
+      !state.connectionStartNode ||
+      state.connectionStartNode === targetNodeId
+    ) {
+      console.warn("🔗 Cannot finish connection - invalid state");
+      get().endConnection();
+      return;
+    }
+
+    const newEdge: Edge = {
+      id: `edge-${state.connectionStartNode}-${targetNodeId}-${Date.now()}`,
+      source: state.connectionStartNode,
+      target: targetNodeId,
+      sourceHandle: state.connectionSourceHandle || undefined,
+      targetHandle: targetHandle || "left",
+      type: "smoothstep",
+      data: {},
+    };
+
+    set((state) => ({
+      edges: [...state.edges, newEdge],
+      isConnecting: false,
+      connectionStartNode: null,
+      connectionSourceHandle: null,
+      connectionPreview: null,
+    }));
+
+    get().saveToHistory();
+    console.log("🔗 Created connection:", newEdge);
+  },
 
   // History management
   saveToHistory: () => {

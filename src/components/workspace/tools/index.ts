@@ -1,9 +1,35 @@
+// export {
+//   RectangleTool,
+//   rectangleTool,
+//   type DrawingState,
+//   type RectangleToolOptions,
+// } from "./RectangleTool";
+
 export {
-  RectangleTool,
-  rectangleTool,
-  type DrawingState,
-  type RectangleToolOptions,
-} from "./RectangleTool";
+  ConnectionTool,
+  connectionTool,
+  type ConnectionState,
+  type ConnectionToolOptions,
+} from "./ConnectionTool";
+
+export {
+  PanTool,
+  panTool,
+  type PanState,
+  type PanToolOptions,
+} from "./PanTool";
+
+export {
+  ShapeTool,
+  rectangleTool, // as shapeRectangleTool,
+  circleTool,
+  diamondTool,
+  triangleTool,
+  getShapeTool,
+  type ShapeType,
+  type ShapeData,
+  type ShapeToolOptions,
+} from "./ShapeTool";
 
 // Future tools can be exported here
 // export { CircleTool, circleTool } from './CircleTool';

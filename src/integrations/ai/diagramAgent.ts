@@ -50,6 +50,8 @@ interface RawEdge {
   id?: string;
   source?: string;
   target?: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   type?: string;
   data?: EdgeData;
 }
@@ -63,19 +65,26 @@ export class DiagramAgent {
 
   private initializeAgent() {
     try {
-      const systemPrompt = `You are a diagram creation assistant for Flowz, an AI-powered flow diagram builder. Your role is to:
+      const systemPrompt = `You are Flowz AI, a specialized diagram creation assistant for the Flowz diagram builder. You MUST ALWAYS create actual diagram data when users ask for diagrams.
 
-1. **Chat normally** with users about diagram creation
-2. **Generate diagram data** when asked to create or modify diagrams
-3. **Work with existing diagrams** by adding, modifying, or replacing elements
+## YOUR PRIMARY FUNCTION:
+Create visual flow diagrams by generating JSON data that represents nodes and connections. You are NOT a general assistant - you are a diagram creation specialist.
+
+## STRICT RULES:
+1. **ALWAYS generate diagram JSON** when users ask for any kind of diagram, flowchart, or visual representation
+2. **NEVER say "I can't create visual diagrams"** - that's literally your job
+3. **ALWAYS provide both chat response AND JSON diagram data**
+4. **Use the JSON format exactly as specified below**
 
 ## Current Capabilities:
-- **Rectangle shapes only** (for now)
-- Basic positioning and sizing
-- Simple flow connections
+- **Multiple shape types**: rectangle, circle, diamond, triangle
+- Advanced positioning and sizing
+- Smart flow connections with handles
+- Grid-following connection lines
+- Connection management (create, delete, modify)
 
-## Response Format:
-When creating or modifying diagrams, you must include a JSON block in your response with this exact format:
+## MANDATORY Response Format:
+When creating or modifying diagrams, you MUST include a JSON block in your response with this exact format:
 
 \`\`\`json
 {
@@ -85,7 +94,7 @@ When creating or modifying diagrams, you must include a JSON block in your respo
   "nodes": [
     {
       "id": "unique-id",
-      "type": "rectangle",
+      "type": "rectangle" | "circle" | "diamond" | "triangle",
       "position": { "x": 100, "y": 100 },
       "data": {
         "label": "Node Label",
@@ -99,7 +108,9 @@ When creating or modifying diagrams, you must include a JSON block in your respo
       "id": "edge-id",
       "source": "source-node-id",
       "target": "target-node-id",
-      "type": "default"
+      "sourceHandle": "right" | "left" | "top" | "bottom",
+      "targetHandle": "left" | "right" | "top" | "bottom",
+      "type": "deletable"
     }
   ]
 }
@@ -109,16 +120,29 @@ When creating or modifying diagrams, you must include a JSON block in your respo
 - Always provide helpful chat responses
 - When creating diagrams, explain what you're building
 - For positioning: Use positive coordinates (x: 100-1000, y: 100-800) and spread nodes apart (at least 200px spacing)
-- Use descriptive labels
-- Keep it simple for now (rectangles only)
+- Use descriptive labels and appropriate shape types
+- **Shape Selection Guide:**
+  - Rectangle: Processes, tasks, actions
+  - Circle: Start/end points, terminals
+  - Diamond: Decision points, conditions
+  - Triangle: Input/output, data flow
+- **Connection Guidelines:**
+  - Use smart handle selection (right→left for horizontal flow, top→bottom for vertical)
+  - Include sourceHandle and targetHandle for precise connections
+  - All edges use type "deletable" for grid-following arrows
 - If modifying existing diagrams, preserve existing nodes but ALWAYS use positive coordinates (minimum x: 100, y: 100)
 - When adding to existing diagrams, position new elements relative to existing ones but ensure all coordinates are positive
 - Always use positive coordinates for visibility
 
 ## Examples:
-- "Create a simple process flow" → Generate 2-3 connected rectangles
-- "Add a decision point" → Add a rectangle labeled "Decision"
-- "Make a flowchart for user login" → Create login process rectangles
+- "Create a simple process flow" → Generate 2-3 connected rectangles with proper handles
+- "Add a decision point" → Add a diamond labeled "Decision" with multiple output connections
+- "Make a flowchart for user login" → Create mixed shapes: circle (start), rectangles (processes), diamond (decisions)
+- "Create a data flow diagram" → Use triangles for data, rectangles for processes, circles for external entities
+- "Connect the login box to the validation diamond" → Create edge with appropriate handles
+
+## CRITICAL INSTRUCTION:
+If a user asks for ANY type of diagram, flowchart, process flow, architecture diagram, or visual representation, you MUST create the diagram JSON. Do not provide text descriptions instead of diagrams. Your job is to create actual visual diagrams that render in the tool.
 
 Remember: Always include both a helpful chat response AND diagram JSON when creating/modifying diagrams.`;
       const defaultHistory: ChatHistory[] = [
@@ -130,7 +154,7 @@ Remember: Always include both a helpful chat response AND diagram JSON when crea
           role: "model",
           parts: [
             {
-              text: "Hello! I'm your diagram creation assistant. I can help you create flow diagrams by chatting with you and generating diagram data. What kind of diagram would you like to create today?",
+              text: "I'm FlowForge AI, your diagram creation specialist! I create visual flow diagrams by generating actual diagram data that renders immediately in your workspace. Tell me what kind of diagram you want to create - a process flow, system architecture, user journey, decision tree, or any other type of flowchart - and I'll build it for you with the appropriate shapes and connections!",
             },
           ],
         },
@@ -142,7 +166,6 @@ Remember: Always include both a helpful chat response AND diagram JSON when crea
       console.error("❌ Failed to initialize diagram agent:", error);
     }
   }
-
   async processRequest(
     request: DiagramCreationRequest
   ): Promise<DiagramCreationResponse> {
@@ -183,13 +206,14 @@ User request: ${request.prompt}`;
       console.log(
         "📝 Agent response received:",
         fullResponse.substring(0, 200) + "..."
-      );
-
-      // Parse diagram data from response
+      ); // Parse diagram data from response (use full response for extraction)
       const diagramData = this.extractDiagramData(fullResponse);
 
+      // Clean the response for user display
+      const cleanedResponse = this.cleanResponseForDisplay(fullResponse);
+
       return {
-        chatResponse: fullResponse,
+        chatResponse: cleanedResponse,
         diagramData,
         success: true,
       };
@@ -201,6 +225,90 @@ User request: ${request.prompt}`;
         }`,
         success: false,
         error: (error as Error)?.message,
+      };
+    }
+  }
+
+  // Streaming version of processRequest
+  async *processRequestStream(request: DiagramCreationRequest): AsyncGenerator<
+    {
+      chatResponse: string;
+      diagramData?: DiagramCreationResponse["diagramData"];
+      isComplete: boolean;
+    },
+    void,
+    unknown
+  > {
+    try {
+      if (!this.chat) {
+        throw new Error("Diagram agent not initialized");
+      }
+
+      // Build context about current diagram
+      let contextPrompt = request.prompt;
+
+      if (request.currentDiagram) {
+        const { nodes, edges, title } = request.currentDiagram;
+        const contextInfo = `
+
+CURRENT DIAGRAM CONTEXT:
+- Title: ${title || "Untitled"}
+- Nodes: ${nodes.length} (${nodes
+          .map((n) => `"${n.data.label || n.id}"`)
+          .join(", ")})
+- Edges: ${edges.length} connections
+- Node details: ${JSON.stringify(nodes, null, 2)}
+- Edge details: ${JSON.stringify(edges, null, 2)}
+
+User request: ${request.prompt}`;
+
+        contextPrompt = contextInfo;
+      }
+      console.log(
+        "🤖 Starting streaming request to diagram agent:",
+        contextPrompt
+      );
+
+      let fullResponse = "";
+      let lastYieldTime = 0;
+      const YIELD_INTERVAL = 150; // Yield every 150ms at most
+
+      for await (const chunk of sendMessageStream(this.chat, contextPrompt)) {
+        fullResponse += chunk; // Accumulate individual chunks
+        console.log("📝 Streaming chunk received:", chunk); // Throttle yielding to prevent too frequent updates
+        const now = Date.now();
+        if (now - lastYieldTime >= YIELD_INTERVAL) {
+          // Clean the response for user display (remove JSON blocks)
+          const cleanedResponse = this.cleanResponseForDisplay(fullResponse);
+          yield {
+            chatResponse: cleanedResponse,
+            isComplete: false,
+          };
+          lastYieldTime = now;
+        }
+      }
+
+      // Parse diagram data from final response (use full response for extraction)
+      const diagramData = this.extractDiagramData(fullResponse);
+
+      // Clean the final response for user display
+      const cleanedFinalResponse = this.cleanResponseForDisplay(fullResponse);
+
+      // Yield final response with diagram data
+      yield {
+        chatResponse: cleanedFinalResponse,
+        diagramData,
+        isComplete: true,
+      };
+
+      console.log("✅ Streaming completed with diagram data:", !!diagramData);
+    } catch (error) {
+      console.error("❌ Diagram agent streaming error:", error);
+      yield {
+        chatResponse: `Sorry, I encountered an error: ${
+          (error as Error)?.message || "Unknown error"
+        }`,
+        isComplete: true,
       };
     }
   }
@@ -260,19 +368,27 @@ User request: ${request.prompt}`;
             },
           };
         }
-      );
-
-      // Ensure all edges have required properties
+      ); // Ensure all edges have required properties
       const validatedEdges: Edge[] = (parsed.edges || []).map(
         (edge: unknown, index: number) => {
           const rawEdge = edge as RawEdge;
-          return {
+          const validatedEdge: Edge = {
             id: rawEdge.id || `edge-${Date.now()}-${index}`,
             source: rawEdge.source || "",
             target: rawEdge.target || "",
-            type: rawEdge.type || "default",
+            type: rawEdge.type || "deletable", // Default to deletable for grid-following
             data: rawEdge.data || {},
           };
+
+          // Only add handle properties if they exist (avoid undefined values)
+          if (rawEdge.sourceHandle) {
+            validatedEdge.sourceHandle = rawEdge.sourceHandle;
+          }
+          if (rawEdge.targetHandle) {
+            validatedEdge.targetHandle = rawEdge.targetHandle;
+          }
+
+          return validatedEdge;
         }
       );
 
@@ -288,9 +404,35 @@ User request: ${request.prompt}`;
     }
   }
 
+  // Clean the response by removing JSON blocks for user display
+  private cleanResponseForDisplay(response: string): string {
+    // Remove JSON code blocks but keep the rest of the text
+    const cleanedResponse = response
+      .replace(/```json\s*[\s\S]*?\s*```/g, "")
+      .trim();
+
+    // Remove any extra whitespace or empty lines
+    return cleanedResponse.replace(/\n\s*\n\s*\n/g, "\n\n").trim();
+  }
+
   // Reset the agent's conversation
   resetAgent() {
+    console.log("🔄 Resetting diagram agent...");
     this.initializeAgent();
+  }
+
+  // Force diagram creation mode
+  enterDiagramMode() {
+    if (!this.chat) {
+      this.initializeAgent();
+      return;
+    }
+
+    // Add a strong reminder message to the chat
+    const reminderMessage = `REMINDER: You are Flowz AI, a diagram creation specialist. When users ask for any type of diagram, flowchart, or visual representation, you MUST create the diagram JSON. Do not provide text descriptions - create actual visual diagrams.`;
+
+    console.log("🔧 Activating diagram creation mode", reminderMessage);
+    // This doesn't need to be awaited, just sets the context
   }
 }
 

@@ -13,111 +13,232 @@ import ReactFlow, {
   Controls,
   MiniMap,
   useReactFlow,
+  Position,
+  ConnectionLineType,
+  ConnectionMode,
+  Edge,
+  NodeTypes,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
-import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
 
-import { rectangleTool } from "./tools";
+import { Node as DiagramNode, Edge as DiagramEdge } from "@/types/diagram";
 
-// Custom Rectangle Node Component
-interface RectangleNodeProps {
+import { getShapeTool, type ShapeType } from "./tools";
+import { nodeTypes } from "./nodes";
+
+// Custom Deletable Edge Component
+interface DeletableEdgeProps {
   id: string;
-  data: {
-    label?: string;
-    width?: number;
-    height?: number;
-  };
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  sourcePosition: Position;
+  targetPosition: Position;
+  style?: React.CSSProperties;
   selected?: boolean;
 }
 
-const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
-  const setSelectedNodeId = useDiagramStore((state) => state.setSelectedNodeId);
+const DeletableEdge: React.FC<DeletableEdgeProps> = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  style = {},
+  selected = false,
+}) => {
+  const { setEdges } = useReactFlow();
+  // Calculate midpoint for delete button based on the actual path
+  const getMidpoint = () => {
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
 
-  // Get React Flow functions from context
-  const { setNodes, setEdges } = useReactFlow();
+    // Calculate midpoint based on the grid path
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal-first path
+      const midX = sourceX + dx * 0.5;
+      return { x: midX, y: sourceY + dy * 0.5 };
+    } else {
+      // Vertical-first path
+      const midY = sourceY + dy * 0.5;
+      return { x: sourceX + dx * 0.5, y: midY };
+    }
+  };
 
+  const { x: midX, y: midY } = getMidpoint();
+
+  // Handle edge deletion
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-
-      // Delete from React Flow (primary source of truth)
-      setNodes((nodes) => nodes.filter((node) => node.id !== id));
-      setEdges((edges) =>
-        edges.filter((edge) => edge.source !== id && edge.target !== id)
-      );
-      setSelectedNodeId(null);
-
-      console.log("🗑️ Deleted rectangle node:", id);
+      setEdges((edges) => edges.filter((edge) => edge.id !== id));
+      console.log("🗑️ Deleted edge:", id);
     },
-    [setNodes, setEdges, setSelectedNodeId, id]
+    [setEdges, id]
   );
+  // Create a grid-following path (orthogonal/stepped)
+  const createGridPath = () => {
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+
+    // Create an orthogonal path that follows grid patterns
+    let path = `M ${sourceX} ${sourceY}`;
+
+    // If the connection is mostly horizontal
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Go horizontal first, then vertical
+      const midX = sourceX + dx * 0.5;
+      path += ` L ${midX} ${sourceY}`;
+      path += ` L ${midX} ${targetY}`;
+      path += ` L ${targetX} ${targetY}`;
+    } else {
+      // Go vertical first, then horizontal
+      const midY = sourceY + dy * 0.5;
+      path += ` L ${sourceX} ${midY}`;
+      path += ` L ${targetX} ${midY}`;
+      path += ` L ${targetX} ${targetY}`;
+    }
+
+    return path;
+  };
+  // Calculate arrow direction based on the final segment
+  const getArrowDirection = () => {
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+
+    // For grid paths, the arrow should point in the direction of the final segment
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal final segment
+      return dx > 0 ? "right" : "left";
+    } else {
+      // Vertical final segment
+      return dy > 0 ? "down" : "up";
+    }
+  };
+
+  const arrowDirection = getArrowDirection();
+  const arrowSize = 8;
+
+  // Create custom arrow based on direction
+  const createArrow = () => {
+    let arrowPath = "";
+    const arrowX = targetX;
+    const arrowY = targetY;
+
+    switch (arrowDirection) {
+      case "right":
+        arrowPath = `M ${arrowX - arrowSize} ${
+          arrowY - arrowSize / 2
+        } L ${arrowX} ${arrowY} L ${arrowX - arrowSize} ${
+          arrowY + arrowSize / 2
+        } Z`;
+        break;
+      case "left":
+        arrowPath = `M ${arrowX + arrowSize} ${
+          arrowY - arrowSize / 2
+        } L ${arrowX} ${arrowY} L ${arrowX + arrowSize} ${
+          arrowY + arrowSize / 2
+        } Z`;
+        break;
+      case "down":
+        arrowPath = `M ${arrowX - arrowSize / 2} ${
+          arrowY - arrowSize
+        } L ${arrowX} ${arrowY} L ${arrowX + arrowSize / 2} ${
+          arrowY - arrowSize
+        } Z`;
+        break;
+      case "up":
+        arrowPath = `M ${arrowX - arrowSize / 2} ${
+          arrowY + arrowSize
+        } L ${arrowX} ${arrowY} L ${arrowX + arrowSize / 2} ${
+          arrowY + arrowSize
+        } Z`;
+        break;
+    }
+
+    return arrowPath;
+  };
 
   return (
-    <div
-      className={`bg-blue-100 border-2 rounded-lg p-4 relative group cursor-move ${
-        selected ? "border-blue-500 shadow-lg" : "border-blue-300"
-      }`}
-      style={{
-        width: data.width || 120,
-        height: data.height || 80,
-        minWidth: 80,
-        minHeight: 60,
-      }}
-    >
-      {/* Drag handle - invisible but covers the whole node */}
-      <div className="absolute inset-0 cursor-move" />
-      <div className="text-center text-sm font-medium text-gray-700 relative z-10 pointer-events-none">
-        {data.label || "Rectangle"}
-      </div>{" "}
+    <g>
+      {/* Main edge path */}
+      <path
+        d={createGridPath()}
+        style={{
+          stroke: selected ? "#3b82f6" : "#374151",
+          strokeWidth: selected ? 3 : 2,
+          fill: "none",
+          ...style,
+        }}
+      />
+      {/* Custom arrow head */}
+      <path
+        d={createArrow()}
+        style={{
+          fill: selected ? "#3b82f6" : "#374151",
+          stroke: selected ? "#3b82f6" : "#374151",
+          strokeWidth: 1,
+        }}
+      />
+      {/* Invisible thicker path for easier selection */}
+      <path
+        d={createGridPath()}
+        style={{
+          stroke: "transparent",
+          strokeWidth: 10,
+          fill: "none",
+          cursor: "pointer",
+        }}
+      />{" "}
       {/* Delete button - only show when selected */}
       {selected && (
-        <Button
-          variant="destructive"
-          size="sm"
-          className="absolute -top-2 -right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-          onClick={handleDelete}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        <g>
+          {/* Button background circle */}
+          <circle
+            cx={midX}
+            cy={midY}
+            r="10"
+            fill="white"
+            stroke="#ef4444"
+            strokeWidth="2"
+            style={{ cursor: "pointer" }}
+            onClick={handleDelete}
+          />
+          {/* X icon */}
+          <g onClick={handleDelete} style={{ cursor: "pointer" }}>
+            <line
+              x1={midX - 5}
+              y1={midY - 5}
+              x2={midX + 5}
+              y2={midY + 5}
+              stroke="#ef4444"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <line
+              x1={midX - 5}
+              y1={midY + 5}
+              x2={midX + 5}
+              y2={midY - 5}
+              stroke="#ef4444"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </g>
+        </g>
       )}
-      {/* Resize handles - only show when selected */}
-      {selected && (
-        <>
-          {/* Corner resize handle */}
-          <div
-            className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 cursor-se-resize border border-white z-20"
-            style={{
-              borderRadius: "0 0 4px 0",
-              transform: "translate(50%, 50%)",
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              // Resize logic will be implemented later
-            }}
-          />
-
-          {/* Right edge resize handle */}
-          <div
-            className="absolute top-1/2 right-0 w-2 h-8 bg-blue-400 cursor-e-resize transform -translate-y-1/2 translate-x-1/2 z-20"
-            style={{ borderRadius: "0 4px 4px 0" }}
-          />
-
-          {/* Bottom edge resize handle */}
-          <div
-            className="absolute bottom-0 left-1/2 w-8 h-2 bg-blue-400 cursor-s-resize transform -translate-x-1/2 translate-y-1/2 z-20"
-            style={{ borderRadius: "0 0 4px 4px" }}
-          />
-        </>
-      )}
-    </div>
+    </g>
   );
 };
 
-// Node types
-const nodeTypes = {
-  rectangle: RectangleNode,
+// Edge types
+const edgeTypes = {
+  default: DeletableEdge,
+  deletable: DeletableEdge,
+  smoothstep: DeletableEdge,
+  straight: DeletableEdge,
 };
 
 interface DiagramCanvasProps {
@@ -131,10 +252,19 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     setNodes,
     setEdges,
     selectedNodeId,
+    selectedEdgeId,
     setSelectedNodeId,
+    setSelectedEdgeId,
     shouldAddRectangle,
     resetAddRectangleFlag,
     setActiveTool,
+    activeTool,
+    isConnecting,
+    connectionStartNode,
+    connectionSourceHandle,
+    connectionPreview,
+    updateConnectionPreview,
+    endConnection,
   } = useDiagramStore();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project, fitView } = useReactFlow();
@@ -146,30 +276,42 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
   // Use React Flow state as primary source of truth
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([]);
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState([]); // Initialize React Flow with Zustand data only once on mount
+
   React.useEffect(() => {
     if (nodes.length > 0 || edges.length > 0) {
       console.log("🔄 Initial sync from Zustand to React Flow");
 
-      const mappedNodes = nodes.map((node) => ({
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        data: node.data,
-        width: node.width,
-        height: node.height,
-        draggable: true,
-        selectable: true,
-      }));
+      const mappedNodes = nodes.map((node) => {
+        const mappedNode: Node = {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: node.data,
+          draggable: true,
+          selectable: true,
+        };
 
-      const mappedEdges = edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle,
-        type: edge.type,
-        data: edge.data,
-      }));
+        // Only add width/height if they exist
+        if (node.width) mappedNode.width = node.width;
+        if (node.height) mappedNode.height = node.height;
+
+        return mappedNode;
+      });
+      const mappedEdges = edges.map((edge) => {
+        const mappedEdge: Edge = {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type,
+          data: edge.data,
+        };
+
+        // Only add handle properties if they exist
+        if (edge.sourceHandle) mappedEdge.sourceHandle = edge.sourceHandle;
+        if (edge.targetHandle) mappedEdge.targetHandle = edge.targetHandle;
+
+        return mappedEdge;
+      });
 
       setFlowNodes(mappedNodes);
       setFlowEdges(mappedEdges);
@@ -178,7 +320,8 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     // Only run once on mount, don't include state dependencies
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  //  // Sync from Zustand to React Flow when diagrams are loaded
+
+  // Sync from Zustand to React Flow when diagrams are loaded OR when edges change
   const prevNodesLength = useRef(nodes.length);
   const prevEdgesLength = useRef(edges.length);
   const lastDiagramId = useRef<string | null>(null);
@@ -188,33 +331,29 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     // 1. Diagram ID changed (new diagram loaded)
     // 2. Significant change in node/edge count
     // 3. Diagram reset (nodes cleared)
+    // 4. New edge created (connection tool)
 
     const { diagramId } = useDiagramStore.getState();
     const diagramIdChanged = diagramId !== lastDiagramId.current;
+    const edgeCountChanged = edges.length !== prevEdgesLength.current;
     const isSignificantChange =
       Math.abs(nodes.length - prevNodesLength.current) > 1 ||
       Math.abs(edges.length - prevEdgesLength.current) > 1 ||
       (nodes.length === 0 && prevNodesLength.current > 0); // Diagram reset
 
-    const shouldSync = diagramIdChanged || isSignificantChange;
+    const shouldSync =
+      diagramIdChanged || isSignificantChange || edgeCountChanged;
+
     if (shouldSync) {
-      console.log("🔄 Syncing loaded diagram from Zustand to React Flow");
+      console.log("🔄 Syncing from Zustand to React Flow");
       console.log("📊 Zustand nodes:", nodes.length, "edges:", edges.length);
       console.log(
-        "📍 Node positions:",
-        nodes.map((n) => ({
-          id: n.id,
-          position: n.position,
-          label: n.data.label,
-        }))
-      );
-      console.log(
-        "📋 Diagram ID changed:",
-        diagramIdChanged,
+        "🔗 Edge count changed:",
+        edgeCountChanged,
         "from",
-        lastDiagramId.current,
+        prevEdgesLength.current,
         "to",
-        diagramId
+        edges.length
       );
 
       isLoadingDiagram.current = true; // Set flag to prevent sync back
@@ -239,19 +378,27 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         type: edge.type,
         data: edge.data,
       }));
+
       setFlowNodes(mappedNodes);
       setFlowEdges(mappedEdges);
-      console.log("✅ Diagram loaded into React Flow");
+      console.log(
+        "✅ Synced to React Flow - Nodes:",
+        mappedNodes.length,
+        "Edges:",
+        mappedEdges.length
+      );
 
-      // Fit the view to show all nodes after a short delay
-      setTimeout(() => {
-        try {
-          fitView({ duration: 200, padding: 0.1 });
-          console.log("🔍 Fitted view to show all nodes");
-        } catch (error) {
-          console.log("⚠️ fitView failed:", error);
-        }
-      }, 100);
+      // Fit the view to show all nodes after a short delay (only for diagram loads)
+      if (diagramIdChanged && (nodes.length > 0 || edges.length > 0)) {
+        setTimeout(() => {
+          try {
+            fitView({ duration: 200, padding: 0.1 });
+            console.log("🔍 Fitted view to show all nodes");
+          } catch (error) {
+            console.log("⚠️ fitView failed:", error);
+          }
+        }, 100);
+      }
 
       // Update tracking refs
       lastDiagramId.current = diagramId;
@@ -264,7 +411,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         console.log("🔓 Loading flag reset - sync enabled");
       }, 200);
     }
-  }, [nodes, edges, setFlowNodes, setFlowEdges]); // Sync React Flow state back to Zustand with debouncing to prevent infinite loops
+  }, [nodes, edges, setFlowNodes, setFlowEdges, fitView]); // Sync React Flow state back to Zustand with debouncing to prevent infinite loops
   const syncTimeoutRef = useRef<NodeJS.Timeout>();
   React.useEffect(() => {
     // Don't sync if we're in the middle of loading a diagram from Zustand
@@ -289,25 +436,36 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         "Edges:",
         flowEdges.length
       );
+      const convertedNodes = flowNodes.map((node) => {
+        const convertedNode: DiagramNode = {
+          id: node.id,
+          type: node.type || "default",
+          position: node.position,
+          data: node.data,
+        };
 
-      const convertedNodes = flowNodes.map((node) => ({
-        id: node.id,
-        type: node.type || "default",
-        position: node.position,
-        data: node.data,
-        width: node.width || undefined,
-        height: node.height || undefined,
-      }));
+        // Only add width/height if they exist
+        if (node.width) convertedNode.width = node.width;
+        if (node.height) convertedNode.height = node.height;
 
-      const convertedEdges = flowEdges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle || undefined,
-        targetHandle: edge.targetHandle || undefined,
-        type: edge.type || "default",
-        data: edge.data,
-      }));
+        return convertedNode;
+      });
+
+      const convertedEdges = flowEdges.map((edge) => {
+        const convertedEdge: DiagramEdge = {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type || "default",
+          data: edge.data || {},
+        };
+
+        // Only add handle properties if they exist
+        if (edge.sourceHandle) convertedEdge.sourceHandle = edge.sourceHandle;
+        if (edge.targetHandle) convertedEdge.targetHandle = edge.targetHandle;
+
+        return convertedEdge;
+      });
 
       setNodes(convertedNodes);
       setEdges(convertedEdges);
@@ -348,10 +506,16 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     setFlowNodes,
     setFlowEdges,
     setSelectedNodeId,
-  ]);
-  // Handle mouse down on pane (start drawing)
+  ]); // Handle mouse down on pane (start drawing or cancel connection)
   const onPaneMouseDown = useCallback(
     (event: React.MouseEvent) => {
+      // Cancel connection if clicking on pane
+      if (activeTool === "connection" && isConnecting) {
+        endConnection();
+        console.log("🔗 Connection cancelled");
+        return;
+      }
+
       if (shouldAddRectangle && reactFlowWrapper.current) {
         // Get coordinates relative to the ReactFlow container
         const rect = reactFlowWrapper.current.getBoundingClientRect();
@@ -363,9 +527,11 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         // Use React Flow's project method to convert to flow coordinates
         const flowPosition = project(screenPosition);
 
-        rectangleTool.startDrawing(flowPosition, screenPosition);
+        // Get the appropriate shape tool based on active tool
+        const currentShapeTool = getShapeTool(activeTool as ShapeType);
+        currentShapeTool.startDrawing(flowPosition, screenPosition);
         console.log(
-          "🟦 Started drawing rectangle at flow coordinates:",
+          `🎨 Started drawing ${activeTool} at flow coordinates:`,
           flowPosition
         );
 
@@ -374,11 +540,29 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         event.stopPropagation();
       }
     },
-    [shouldAddRectangle, project]
-  ); // Handle mouse move (update drawing preview)
+    [shouldAddRectangle, project, activeTool, isConnecting, endConnection]
+  );
+
+  // Handle mouse move (update drawing preview)
   const onPaneMouseMove = useCallback(
     (event: React.MouseEvent) => {
-      if (rectangleTool.isActive() && reactFlowWrapper.current) {
+      // Handle connection preview
+      if (
+        activeTool === "connection" &&
+        isConnecting &&
+        reactFlowWrapper.current
+      ) {
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        const screenPosition = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        const flowPosition = project(screenPosition);
+        updateConnectionPreview(flowPosition);
+      }
+
+      // Handle shape drawing
+      if (shouldAddRectangle && reactFlowWrapper.current) {
         // Get coordinates relative to the ReactFlow container
         const rect = reactFlowWrapper.current.getBoundingClientRect();
         const screenPosition = {
@@ -389,31 +573,54 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         // Use React Flow's project method to convert to flow coordinates
         const flowPosition = project(screenPosition);
 
-        rectangleTool.updateDrawing(flowPosition, screenPosition);
-        forceRerender(); // Trigger re-render for preview update
+        // Get the appropriate shape tool based on active tool
+        const currentShapeTool = getShapeTool(activeTool as ShapeType);
+        if (currentShapeTool.isActive()) {
+          currentShapeTool.updateDrawing(flowPosition, screenPosition);
+          forceRerender(); // Trigger re-render for preview update
+        }
       }
     },
-    [project, forceRerender]
+    [
+      project,
+      forceRerender,
+      activeTool,
+      isConnecting,
+      updateConnectionPreview,
+      shouldAddRectangle,
+    ]
   ); // Handle mouse up (finish drawing)
   const onPaneMouseUp = useCallback(() => {
-    if (rectangleTool.isActive()) {
-      const newNode = rectangleTool.finishDrawing();
+    if (shouldAddRectangle) {
+      // Get the appropriate shape tool based on active tool
+      const currentShapeTool = getShapeTool(activeTool as ShapeType);
 
-      if (newNode) {
-        // Add to React Flow (primary source of truth)
-        setFlowNodes((nodes) => [...nodes, newNode]);
+      if (currentShapeTool.isActive()) {
+        const newNode = currentShapeTool.finishDrawing();
 
-        // Select the new node
-        setSelectedNodeId(newNode.id);
+        if (newNode) {
+          // Add to React Flow (primary source of truth)
+          setFlowNodes((nodes) => [...nodes, newNode]);
 
-        console.log("✅ Rectangle created successfully");
+          // Select the new node
+          setSelectedNodeId(newNode.id);
+
+          console.log(`✅ ${activeTool} created successfully`);
+        }
+
+        // Switch back to move tool in both flags and UI
+        resetAddRectangleFlag();
+        setActiveTool("select");
       }
-
-      // Switch back to move tool in both flags and UI
-      resetAddRectangleFlag();
-      setActiveTool("select");
     }
-  }, [setFlowNodes, setSelectedNodeId, resetAddRectangleFlag, setActiveTool]);
+  }, [
+    shouldAddRectangle,
+    activeTool,
+    setFlowNodes,
+    setSelectedNodeId,
+    resetAddRectangleFlag,
+    setActiveTool,
+  ]);
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChange(changes);
@@ -437,24 +644,36 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     },
     [flowEdges, setFlowEdges]
   );
-
   // Handle node selection
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
       setSelectedNodeId(node.id);
+      setSelectedEdgeId(null); // Deselect edges when selecting nodes
     },
-    [setSelectedNodeId]
+    [setSelectedNodeId, setSelectedEdgeId]
+  );
+
+  // Handle edge selection
+  const onEdgeClick = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      event.stopPropagation();
+      setSelectedEdgeId(edge.id);
+      setSelectedNodeId(null); // Deselect nodes when selecting edges
+    },
+    [setSelectedEdgeId, setSelectedNodeId]
   ); // Handle pane click (deselect when not drawing)
   const onPaneClick = useCallback(() => {
     if (!shouldAddRectangle) {
       setSelectedNodeId(null);
+      setSelectedEdgeId(null); // Also deselect edges
     }
-  }, [shouldAddRectangle, setSelectedNodeId]);
+  }, [shouldAddRectangle, setSelectedNodeId, setSelectedEdgeId]);
   return (
     <div
       className={`h-full w-full bg-gray-50 relative ${className}`}
       ref={reactFlowWrapper}
     >
+      {" "}
       <ReactFlow
         nodes={flowNodes.map((node) => ({
           ...node,
@@ -462,26 +681,48 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
           draggable: !shouldAddRectangle, // Disable dragging when in draw mode
           selectable: !shouldAddRectangle, // Disable selection when in draw mode
         }))}
-        edges={flowEdges}
+        edges={flowEdges.map((edge) => ({
+          ...edge,
+          selected: edge.id === selectedEdgeId,
+        }))}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onInit={() => {}}
         onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
         onMouseDown={onPaneMouseDown}
         onMouseMove={onPaneMouseMove}
         onMouseUp={onPaneMouseUp}
-        nodeTypes={nodeTypes}
+        nodeTypes={nodeTypes as NodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         attributionPosition="bottom-left"
         nodesDraggable={!shouldAddRectangle}
-        nodesConnectable={!shouldAddRectangle}
+        nodesConnectable={true}
         elementsSelectable={!shouldAddRectangle}
         selectNodesOnDrag={false}
-        panOnDrag={shouldAddRectangle ? false : [1, 2]} // Disable panning when drawing
+        panOnDrag={shouldAddRectangle ? false : [1, 2]} // Enable panning with left and right mouse buttons when not drawing
         selectionOnDrag={!shouldAddRectangle}
-        style={{ cursor: shouldAddRectangle ? "crosshair" : "default" }}
+        connectionMode={"loose" as ConnectionMode}
+        snapToGrid={true}
+        snapGrid={[20, 20]}
+        defaultEdgeOptions={{
+          type: "default", // This will use our DeletableEdge component
+          style: { strokeWidth: 2, stroke: "#374151" },
+        }}
+        connectionLineType={"smoothstep" as ConnectionLineType}
+        connectionLineStyle={{ strokeWidth: 2, stroke: "#10b981" }}
+        deleteKeyCode={null} // Disable default delete behavior
+        multiSelectionKeyCode={null} // Disable multi-selection
+        isValidConnection={(connection) => {
+          // Allow connections between different nodes only
+          return connection.source !== connection.target;
+        }}
+        style={{
+          cursor: shouldAddRectangle ? "crosshair" : "default",
+        }}
       >
         {" "}
         <Background />
@@ -489,10 +730,21 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         <MiniMap />{" "}
         {/* Drawing Preview Overlay - positioned using screen coordinates */}
         {(() => {
-          const previewBounds = rectangleTool.getPreviewScreenBounds();
+          if (!shouldAddRectangle) return null;
+
+          // Get the appropriate shape tool based on active tool
+          const currentShapeTool = getShapeTool(activeTool as ShapeType);
+          const previewBounds = currentShapeTool.getPreviewScreenBounds();
+
           return previewBounds ? (
             <div
-              className="absolute pointer-events-none border-2 border-blue-500 bg-blue-100 bg-opacity-50"
+              className={`absolute pointer-events-none border-2 border-blue-500 bg-blue-100 bg-opacity-50 ${
+                activeTool === "circle"
+                  ? "rounded-full"
+                  : activeTool === "diamond"
+                  ? "transform rotate-45"
+                  : ""
+              }`}
               style={{
                 left: previewBounds.x,
                 top: previewBounds.y,
@@ -503,6 +755,113 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
             />
           ) : null;
         })()}
+        {/* Connection Preview Overlay */}
+        {isConnecting &&
+          connectionStartNode &&
+          connectionPreview &&
+          (() => {
+            // Find the source node to get its position
+            const sourceNode = flowNodes.find(
+              (node) => node.id === connectionStartNode
+            );
+            if (!sourceNode) return null;
+
+            // Get source node screen position
+            const sourceWidth = sourceNode.data?.width || 120;
+            const sourceHeight = sourceNode.data?.height || 80;
+            const sourceCenter = {
+              x: sourceNode.position.x + sourceWidth / 2,
+              y: sourceNode.position.y + sourceHeight / 2,
+            };
+
+            // Calculate handle position based on source handle
+            let handleOffset = { x: 0, y: 0 };
+            switch (connectionSourceHandle) {
+              case "top":
+                handleOffset = { x: 0, y: -sourceHeight / 2 };
+                break;
+              case "right":
+                handleOffset = { x: sourceWidth / 2, y: 0 };
+                break;
+              case "bottom":
+                handleOffset = { x: 0, y: sourceHeight / 2 };
+                break;
+              case "left":
+                handleOffset = { x: -sourceWidth / 2, y: 0 };
+                break;
+            }
+
+            const startPoint = {
+              x: sourceCenter.x + handleOffset.x,
+              y: sourceCenter.y + handleOffset.y,
+            };
+
+            const endPoint = connectionPreview;
+
+            // Create grid-following preview path
+            const createPreviewPath = () => {
+              const dx = endPoint.x - startPoint.x;
+              const dy = endPoint.y - startPoint.y;
+
+              let path = `M ${startPoint.x} ${startPoint.y}`;
+
+              // If the connection is mostly horizontal
+              if (Math.abs(dx) > Math.abs(dy)) {
+                // Go horizontal first, then vertical
+                const midX = startPoint.x + dx * 0.5;
+                path += ` L ${midX} ${startPoint.y}`;
+                path += ` L ${midX} ${endPoint.y}`;
+                path += ` L ${endPoint.x} ${endPoint.y}`;
+              } else {
+                // Go vertical first, then horizontal
+                const midY = startPoint.y + dy * 0.5;
+                path += ` L ${startPoint.x} ${midY}`;
+                path += ` L ${endPoint.x} ${midY}`;
+                path += ` L ${endPoint.x} ${endPoint.y}`;
+              }
+
+              return path;
+            };
+
+            return (
+              <svg
+                className="absolute pointer-events-none"
+                style={{
+                  left: 0,
+                  top: 0,
+                  width: "100%",
+                  height: "100%",
+                  zIndex: 1000,
+                }}
+              >
+                <defs>
+                  <marker
+                    id="connection-preview-arrow"
+                    markerWidth="10"
+                    markerHeight="10"
+                    refX="9"
+                    refY="3"
+                    orient="auto"
+                    markerUnits="strokeWidth"
+                  >
+                    <polygon
+                      points="0,0 0,6 9,3"
+                      fill="#10b981"
+                      stroke="#10b981"
+                    />
+                  </marker>
+                </defs>{" "}
+                <path
+                  d={createPreviewPath()}
+                  stroke="#10b981"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeDasharray="5,5"
+                  markerEnd="url(#connection-preview-arrow)"
+                />
+              </svg>
+            );
+          })()}
       </ReactFlow>
     </div>
   );

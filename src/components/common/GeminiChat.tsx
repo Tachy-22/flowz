@@ -6,12 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Send, Bot, User, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  createChat,
-  sendMessageStream,
-  ChatHistory,
-  GeminiChat as Chat,
-} from "@/integrations/gemini";
+import { createChat, ChatHistory } from "@/integrations/gemini";
 import { diagramAgent, DiagramCreationRequest } from "@/integrations/ai";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { useUserStore } from "@/integrations/zustand";
@@ -39,7 +34,7 @@ const GeminiChat: React.FC = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [chat, setChat] = useState<Chat | null>(null);
+  //  const [chat, setChat] = useState<Chat | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null); // Get diagram state and functions
   const {
@@ -47,10 +42,9 @@ const GeminiChat: React.FC = () => {
     edges,
     diagramTitle,
     diagramId,
-    setNodes,
-    setEdges,
+
     setDiagramId,
-    setDiagramTitle,
+
     setLoading: setDiagramLoading,
     loadDiagram,
   } = useDiagramStore();
@@ -78,7 +72,7 @@ const GeminiChat: React.FC = () => {
         console.log("Chat instance type:", typeof chatInstance);
         console.log("Chat instance keys:", Object.keys(chatInstance || {}));
 
-        setChat(chatInstance);
+        //  setChat(chatInstance);
         console.log("🎯 Chat state updated");
       } catch (error) {
         console.error("❌ Failed to initialize chat:");
@@ -145,34 +139,44 @@ const GeminiChat: React.FC = () => {
               }
             : undefined,
       };
-
       console.log("📤 Sending request to diagram agent");
-      const response = await diagramAgent.processRequest(request);
 
-      console.log("📥 Agent response received:", {
-        success: response.success,
-        hasDiagramData: !!response.diagramData,
-        chatLength: response.chatResponse.length,
+      // Use streaming version for real-time updates
+      let finalDiagramData: {
+        nodes: Node[];
+        edges: Edge[];
+        title: string;
+        description?: string;
+      } | null = null;
+      for await (const chunk of diagramAgent.processRequestStream(request)) {
+        // Update the message with streaming content
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessage.id
+              ? {
+                  ...msg,
+                  content: chunk.chatResponse,
+                  isStreaming: !chunk.isComplete,
+                  hasDiagramData: !!chunk.diagramData,
+                }
+              : msg
+          )
+        );
+
+        // Store diagram data when complete
+        if (chunk.isComplete && chunk.diagramData) {
+          finalDiagramData = chunk.diagramData;
+        }
+      }
+
+      console.log("📥 Streaming completed:", {
+        hasDiagramData: !!finalDiagramData,
       });
 
-      // Update the message with the chat response
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessage.id
-            ? {
-                ...msg,
-                content: response.chatResponse,
-                isStreaming: false,
-                hasDiagramData: !!response.diagramData,
-              }
-            : msg
-        )
-      );
-
       // If diagram data was generated, create/update the diagram
-      if (response.diagramData && user) {
+      if (finalDiagramData && user) {
         console.log("🎨 Creating/updating diagram with AI-generated data");
-        await createDiagramFromAI(response.diagramData);
+        await createDiagramFromAI(finalDiagramData);
       }
     } catch (error) {
       console.error("❌ Error in AI diagram creation:", error);
@@ -283,8 +287,9 @@ const GeminiChat: React.FC = () => {
       },
     ];
     const chatInstance = createChat(defaultHistory);
-    setChat(chatInstance);
+    console.log(chatInstance);
   };
+
   return (
     <div className="h-full flex flex-col">
       {/* Chat Header */}
@@ -301,7 +306,7 @@ const GeminiChat: React.FC = () => {
         </Button>
       </div>{" "}
       {/* Messages Area */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="w-full flex-1 flex flex-col min-h-0 ">
         {/* Messages ScrollArea */}
         <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
           <div className="space-y-4 py-4">
