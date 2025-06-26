@@ -2,7 +2,6 @@ import RectangleNode from "./RectangleNode";
 import CircleNode from "./CircleNode";
 import DiamondNode from "./DiamondNode";
 import TriangleNode from "./TriangleNode";
-import TextNode from "./TextNode";
 
 // Export all node types for easy importing
 export const nodeTypes = {
@@ -10,7 +9,6 @@ export const nodeTypes = {
   circle: CircleNode,
   diamond: DiamondNode,
   triangle: TriangleNode,
-  text: TextNode,
 };
 
 // Also export individual nodes

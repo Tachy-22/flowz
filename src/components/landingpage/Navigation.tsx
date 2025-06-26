@@ -1,10 +1,13 @@
-
 const Navigation = () => {
   return (
     <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
       <div className="flex items-center space-x-8">
-        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-          <span className="text-white font-bold">A</span>
+        <div className=" font-bold flex items-center justify-center gap-1">
+          <span className="text-white  w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center ">
+            {" "}
+            F
+          </span>{" "}
+          LOWZ
         </div>
         <div className="hidden md:flex items-center space-x-6 text-gray-600">
           <a href="#" className="hover:text-gray-900">

@@ -3,7 +3,7 @@ import React, { useCallback, useState } from "react";
 import { useReactFlow, Handle, Position } from "reactflow";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { Button } from "@/components/ui/button";
-import { Trash2, Edit3 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 // Custom Rectangle Node Component
 interface RectangleNodeProps {
@@ -28,9 +28,6 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
   } = useDiagramStore();
 
   const [isHovered, setIsHovered] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(data.label || "Rectangle");
-  const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Get React Flow functions from context
   const { setNodes, setEdges } = useReactFlow();
@@ -113,43 +110,6 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
       hasConnections(handleId)
     );
 
-  // Focus input when editing starts
-  React.useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      try {
-        if (typeof inputRef.current.select === "function") {
-          inputRef.current.select();
-        }
-      } catch {
-        // Ignore if select is not available
-      }
-    }
-  }, [isEditing]);
-
-  // Save label to state
-  const handleSave = useCallback(() => {
-    setIsEditing(false);
-    setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === id ? { ...node, data: { ...node.data, label } } : node
-      )
-    );
-  }, [id, label, setNodes]);
-
-  // Handle key press in input
-  const handleKeyPress = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsEditing(false);
-        setLabel(data.label || "Rectangle");
-      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey || !e.shiftKey)) {
-        handleSave();
-      }
-    },
-    [data.label, handleSave]
-  );
-
   return (
     <div
       className={`bg-blue-100 border-2 rounded-lg p-4 relative group cursor-move ${
@@ -166,7 +126,6 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
         minHeight: 60,
       }}
       onClick={handleNodeClick}
-      onDoubleClick={() => setIsEditing(true)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -231,35 +190,9 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
         })}
       {/* Drag handle - invisible but covers the whole node */}
       <div className="absolute inset-0 cursor-move" />
-      <div className="text-center text-sm font-medium text-gray-700 relative z-10 pointer-events-auto">
-        {isEditing ? (
-          <textarea
-            ref={inputRef}
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyPress}
-            className="w-full bg-transparent border border-blue-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-blue-500"
-            style={{ textAlign: "center" }}
-          />
-        ) : (
-          label
-        )}
-      </div>
-      {/* Edit button - show when selected and not editing */}
-      {selected && !isEditing && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="absolute -top-2 -left-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsEditing(true);
-          }}
-        >
-          <Edit3 className="h-3 w-3" />
-        </Button>
-      )}
+      <div className="text-center text-sm font-medium text-gray-700 relative z-10 pointer-events-none">
+        {data.label || "Rectangle"}
+      </div>{" "}
       {/* Delete button - only show when selected */}
       {selected && (
         <Button

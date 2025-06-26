@@ -1,23 +1,14 @@
 import { Node } from "reactflow";
 
-export type ShapeType =
-  | "rectangle"
-  | "circle"
-  | "diamond"
-  | "triangle"
-  | "text";
+export type ShapeType = "rectangle" | "circle" | "diamond" | "triangle";
 
 export interface ShapeData {
   label?: string;
-  text?: string;
   width?: number;
   height?: number;
   radius?: number; // For circles
   color?: string;
   backgroundColor?: string;
-  fontSize?: number; // For text
-  fontWeight?: string; // For text
-  textAlign?: "left" | "center" | "right"; // For text
 }
 
 export interface ShapeToolOptions {
@@ -241,6 +232,7 @@ export class ShapeTool {
     console.log(`✅ Created ${this.options.shapeType} node:`, node);
     return node;
   }
+
   private getDefaultLabel(): string {
     switch (this.options.shapeType) {
       case "rectangle":
@@ -251,12 +243,11 @@ export class ShapeTool {
         return "Diamond";
       case "triangle":
         return "Triangle";
-      case "text":
-        return "Enter text...";
       default:
         return "Shape";
     }
   }
+
   private getShapeSpecificData(bounds: Bounds): Partial<ShapeData> {
     switch (this.options.shapeType) {
       case "rectangle":
@@ -281,15 +272,6 @@ export class ShapeTool {
         return {
           width: bounds.width,
           height: bounds.height,
-        };
-      case "text":
-        return {
-          text: "Enter text...",
-          width: bounds.width || this.options.defaultWidth,
-          height: bounds.height || this.options.defaultHeight,
-          fontSize: 14,
-          fontWeight: "normal",
-          textAlign: "left",
         };
       default:
         return {
@@ -334,14 +316,6 @@ export const triangleTool = new ShapeTool({
   minHeight: 30,
 });
 
-export const textTool = new ShapeTool({
-  shapeType: "text",
-  defaultWidth: 200,
-  defaultHeight: 100,
-  minWidth: 100,
-  minHeight: 40,
-});
-
 // Export a function to get the appropriate tool for a shape type
 export function getShapeTool(shapeType: ShapeType): ShapeTool {
   switch (shapeType) {
@@ -353,8 +327,6 @@ export function getShapeTool(shapeType: ShapeType): ShapeTool {
       return diamondTool;
     case "triangle":
       return triangleTool;
-    case "text":
-      return textTool;
     default:
       return rectangleTool;
   }

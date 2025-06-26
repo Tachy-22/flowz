@@ -24,7 +24,7 @@ import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 
 import { Node as DiagramNode, Edge as DiagramEdge } from "@/types/diagram";
 
-import { getShapeTool, type ShapeType } from "./tools";
+import { getShapeTool, panTool, type ShapeType } from "./tools";
 import { nodeTypes } from "./nodes";
 
 // Custom Deletable Edge Component
@@ -509,6 +509,14 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
   ]); // Handle mouse down on pane (start drawing or cancel connection)
   const onPaneMouseDown = useCallback(
     (event: React.MouseEvent) => {
+      // Handle pan tool - just track that we started panning, let React Flow handle it
+      if (activeTool === "pan") {
+        panTool.startPanning({ x: event.clientX, y: event.clientY });
+        console.log("🤚 Pan tool: Started panning");
+        // Don't prevent default - let React Flow handle the panning
+        return;
+      }
+
       // Cancel connection if clicking on pane
       if (activeTool === "connection" && isConnecting) {
         endConnection();
@@ -541,11 +549,15 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       }
     },
     [shouldAddRectangle, project, activeTool, isConnecting, endConnection]
-  );
-
-  // Handle mouse move (update drawing preview)
+  ); // Handle mouse move (update drawing preview)
   const onPaneMouseMove = useCallback(
     (event: React.MouseEvent) => {
+      // Handle pan tool movement - just track that we're panning
+      if (activeTool === "pan" && panTool.isActive()) {
+        // Let React Flow handle the actual panning, we just track state
+        return;
+      }
+
       // Handle connection preview
       if (
         activeTool === "connection" &&
@@ -589,8 +601,16 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       updateConnectionPreview,
       shouldAddRectangle,
     ]
-  ); // Handle mouse up (finish drawing)
+  ); // Handle mouse up (finish drawing or panning)
   const onPaneMouseUp = useCallback(() => {
+    // Handle pan tool finish
+    if (activeTool === "pan" && panTool.isActive()) {
+      panTool.stopPanning();
+      setActiveTool("select"); // Switch back to select tool after panning
+      console.log("🤚 Pan tool: Finished panning, switched to select tool");
+      return;
+    }
+
     if (shouldAddRectangle) {
       // Get the appropriate shape tool based on active tool
       const currentShapeTool = getShapeTool(activeTool as ShapeType);
@@ -699,12 +719,14 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         edgeTypes={edgeTypes}
         fitView
         attributionPosition="bottom-left"
-        nodesDraggable={!shouldAddRectangle}
+        nodesDraggable={!shouldAddRectangle && activeTool !== "pan"}
         nodesConnectable={true}
-        elementsSelectable={!shouldAddRectangle}
+        elementsSelectable={!shouldAddRectangle && activeTool !== "pan"}
         selectNodesOnDrag={false}
-        panOnDrag={shouldAddRectangle ? false : [1, 2]} // Enable panning with left and right mouse buttons when not drawing
-        selectionOnDrag={!shouldAddRectangle}
+        panOnDrag={
+          activeTool === "pan" ? [1] : shouldAddRectangle ? false : [1, 2]
+        } // Enable panning with left click for pan tool, both buttons for normal mode
+        selectionOnDrag={!shouldAddRectangle && activeTool !== "pan"}
         connectionMode={"loose" as ConnectionMode}
         snapToGrid={true}
         snapGrid={[20, 20]}
@@ -721,7 +743,11 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
           return connection.source !== connection.target;
         }}
         style={{
-          cursor: shouldAddRectangle ? "crosshair" : "default",
+          cursor: shouldAddRectangle
+            ? "crosshair"
+            : activeTool === "pan"
+            ? "grab"
+            : "default",
         }}
       >
         {" "}

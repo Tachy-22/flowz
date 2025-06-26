@@ -15,11 +15,13 @@ import {
   Circle,
   Triangle,
   Diamond,
+  ArrowRight,
   Type,
   Image,
   Pen,
   Move,
   MousePointer,
+  Hand,
   X,
   LucideIcon,
   File,
@@ -60,7 +62,7 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
       const diagrams = await diagramService.getUserDiagrams(user.uid, {
         orderBy: "updatedAt",
         orderDirection: "desc",
-        limit: 100,
+        limit: 10,
       });
       console.log("📊 Found diagrams:", diagrams);
       setRecentDiagrams(diagrams);
@@ -124,6 +126,10 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
         console.log("🔗 Connection tool selected");
         setActiveTool("connection");
         break;
+      case "Pan":
+        console.log("🤚 Pan tool selected");
+        setActiveTool("pan");
+        break;
       case "Circle":
         console.log("⭕ Circle tool selected, triggering add shape");
         setActiveTool("circle");
@@ -146,10 +152,7 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
         setActiveTool("arrow");
         break;
       case "Text":
-        console.log("📝 Text tool selected, triggering add shape");
         setActiveTool("text");
-        triggerAddRectangle(); // This will trigger shape drawing mode
-        console.log("✅ Text tool activated");
         break;
       default:
         setActiveTool("select");
@@ -157,6 +160,7 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
   };
   const tools = [
     { icon: MousePointer, label: "Select", category: "basic" },
+    { icon: Hand, label: "Pan", category: "basic" },
     { icon: Move, label: "Move", category: "basic" },
     { icon: Link, label: "Connection", category: "basic" },
   ];
@@ -166,6 +170,13 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
     { icon: Circle, label: "Circle", category: "shapes" },
     { icon: Triangle, label: "Triangle", category: "shapes" },
     { icon: Diamond, label: "Diamond", category: "shapes" },
+  ];
+
+  const flowElements = [
+    { icon: Square, label: "Process", category: "flow" },
+    { icon: Diamond, label: "Decision", category: "flow" },
+    { icon: Circle, label: "Start/End", category: "flow" },
+    { icon: ArrowRight, label: "Arrow", category: "flow" },
   ];
 
   const otherTools = [
@@ -283,6 +294,7 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
       <div className="flex-1 overflow-y-auto p-4">
         <ToolSection title="Tools" items={tools} />
         <ToolSection title="Basic Shapes" items={shapes} />
+        <ToolSection title="Flow Elements" items={flowElements} />
         <ToolSection title="Other" items={otherTools} />
       </div>
 

@@ -206,14 +206,13 @@ User request: ${request.prompt}`;
       console.log(
         "📝 Agent response received:",
         fullResponse.substring(0, 200) + "..."
-      ); // Parse diagram data from response (use full response for extraction)
+      );
+
+      // Parse diagram data from response
       const diagramData = this.extractDiagramData(fullResponse);
 
-      // Clean the response for user display
-      const cleanedResponse = this.cleanResponseForDisplay(fullResponse);
-
       return {
-        chatResponse: cleanedResponse,
+        chatResponse: fullResponse,
         diagramData,
         success: true,
       };
@@ -230,7 +229,9 @@ User request: ${request.prompt}`;
   }
 
   // Streaming version of processRequest
-  async *processRequestStream(request: DiagramCreationRequest): AsyncGenerator<
+  async *processRequestStream(
+    request: DiagramCreationRequest
+  ): AsyncGenerator<
     {
       chatResponse: string;
       diagramData?: DiagramCreationResponse["diagramData"];
@@ -275,28 +276,25 @@ User request: ${request.prompt}`;
 
       for await (const chunk of sendMessageStream(this.chat, contextPrompt)) {
         fullResponse += chunk; // Accumulate individual chunks
-        console.log("📝 Streaming chunk received:", chunk); // Throttle yielding to prevent too frequent updates
+        console.log("📝 Streaming chunk received:", chunk);
+
+        // Throttle yielding to prevent too frequent updates
         const now = Date.now();
         if (now - lastYieldTime >= YIELD_INTERVAL) {
-          // Clean the response for user display (remove JSON blocks)
-          const cleanedResponse = this.cleanResponseForDisplay(fullResponse);
           yield {
-            chatResponse: cleanedResponse,
+            chatResponse: fullResponse,
             isComplete: false,
           };
           lastYieldTime = now;
         }
       }
 
-      // Parse diagram data from final response (use full response for extraction)
+      // Parse diagram data from final response
       const diagramData = this.extractDiagramData(fullResponse);
-
-      // Clean the final response for user display
-      const cleanedFinalResponse = this.cleanResponseForDisplay(fullResponse);
 
       // Yield final response with diagram data
       yield {
-        chatResponse: cleanedFinalResponse,
+        chatResponse: fullResponse,
         diagramData,
         isComplete: true,
       };
@@ -403,18 +401,6 @@ User request: ${request.prompt}`;
       return undefined;
     }
   }
-
-  // Clean the response by removing JSON blocks for user display
-  private cleanResponseForDisplay(response: string): string {
-    // Remove JSON code blocks but keep the rest of the text
-    const cleanedResponse = response
-      .replace(/```json\s*[\s\S]*?\s*```/g, "")
-      .trim();
-
-    // Remove any extra whitespace or empty lines
-    return cleanedResponse.replace(/\n\s*\n\s*\n/g, "\n\n").trim();
-  }
-
   // Reset the agent's conversation
   resetAgent() {
     console.log("🔄 Resetting diagram agent...");
