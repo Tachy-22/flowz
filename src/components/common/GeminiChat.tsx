@@ -171,6 +171,7 @@ const GeminiChat: React.FC = () => {
 
       console.log("📥 Streaming completed:", {
         hasDiagramData: !!finalDiagramData,
+        finalDiagramData,
       });
 
       // If diagram data was generated, create/update the diagram
@@ -207,6 +208,7 @@ const GeminiChat: React.FC = () => {
     edges: Edge[];
     title: string;
     description?: string;
+    action?: string;
   }) => {
     if (!user || !diagramData) return;
     try {
@@ -226,7 +228,8 @@ const GeminiChat: React.FC = () => {
       );
 
       // Save to Firebase
-      if (diagramId) {
+      if (diagramId && diagramData.action === "modify_diagram") {
+        console.log({ action: diagramData.action });
         // Update existing diagram
         console.log("💾 Updating existing diagram with AI data");
         await diagramService.updateDiagramContent(
@@ -397,13 +400,13 @@ const GeminiChat: React.FC = () => {
                             ),
                             // Customize code
                             code: ({ children }) => (
-                              <code className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-900 font-mono text-xs">
+                              <code className="bg-gray-200 px-1.5 py-0.5 rounded text-gray-900 font-mono text-xs hidden">
                                 {children}
                               </code>
                             ),
                             // Customize code blocks
                             pre: ({ children }) => (
-                              <pre className="bg-gray-200 p-3 rounded-lg overflow-x-auto my-2">
+                              <pre className="bg-gray-200 p-3 rounded-lg overflow-x-auto my-2 hidden">
                                 {children}
                               </pre>
                             ),

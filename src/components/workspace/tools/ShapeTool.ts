@@ -247,7 +247,6 @@ export class ShapeTool {
         return "Shape";
     }
   }
-
   private getShapeSpecificData(bounds: Bounds): Partial<ShapeData> {
     switch (this.options.shapeType) {
       case "rectangle":

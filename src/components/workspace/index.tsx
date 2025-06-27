@@ -16,6 +16,7 @@ import GeminiChat from "@/components/common/GeminiChat";
 import TopToolbar from "./TopToolbar";
 import ToolsSidebar from "./ToolsSidebar";
 import DiagramCanvas from "./DiagramCanvas";
+import { ReactFlowProvider } from "reactflow";
 
 const WorkspaceIndex: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -100,8 +101,7 @@ const WorkspaceIndex: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {" "}
-      {/* Top Toolbar */}
+    <ReactFlowProvider>      {/* Top Toolbar */}
       <TopToolbar
         user={user}
         onSignOut={handleSignOut}
@@ -160,6 +160,7 @@ const WorkspaceIndex: React.FC = () => {
           </div>
         </div>
       </div>
+        </ReactFlowProvider>
     </div>
   );
 };

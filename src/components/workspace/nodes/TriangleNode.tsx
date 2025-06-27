@@ -1,9 +1,9 @@
 "use client";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useRef } from "react";
 import { Handle, Position, useReactFlow } from "reactflow";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 // Triangle Node Component
 interface TriangleNodeProps {
@@ -28,6 +28,9 @@ const TriangleNode: React.FC<TriangleNodeProps> = ({ id, data, selected }) => {
   } = useDiagramStore();
 
   const [isHovered, setIsHovered] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(data.label || "Triangle");
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Get React Flow functions from context
   const { setNodes, setEdges } = useReactFlow();
@@ -106,37 +109,111 @@ const TriangleNode: React.FC<TriangleNodeProps> = ({ id, data, selected }) => {
   const width = data.width || 120;
   const height = data.height || 80;
 
+  // Resizing state and logic
+  const resizeStart = useRef<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // Mouse down on resize handle
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: width,
+      height: height,
+    };
+    window.addEventListener("mousemove", handleResizeMouseMove);
+    window.addEventListener("mouseup", handleResizeMouseUp);
+  };
+
+  // Mouse move while resizing
+  const handleResizeMouseMove = (e: MouseEvent) => {
+    if (!resizeStart.current) return;
+    const dx = e.clientX - resizeStart.current.x;
+    const dy = e.clientY - resizeStart.current.y;
+    const newWidth = Math.max(40, resizeStart.current.width + dx);
+    const newHeight = Math.max(30, resizeStart.current.height + dy);
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, width: newWidth, height: newHeight },
+            }
+          : node
+      )
+    );
+  };
+
+  // Mouse up to finish resizing
+  const handleResizeMouseUp = () => {
+    resizeStart.current = null;
+    window.removeEventListener("mousemove", handleResizeMouseMove);
+    window.removeEventListener("mouseup", handleResizeMouseUp);
+  };
+
+  // Focus textarea when editing
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  // Save label edit
+  const saveEdit = useCallback(() => {
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? { ...node, data: { ...node.data, label: editValue } }
+          : node
+      )
+    );
+    setIsEditing(false);
+  }, [editValue, id, setNodes]);
+
   return (
     <div
       className={`relative group cursor-move flex items-center justify-center ${
-        activeTool === "connection" ? "hover:shadow-purple-200" : ""
+        selected ? "border-yellow-500 shadow-lg" : "border-yellow-300"
+      } ${
+        activeTool === "connection"
+          ? "hover:border-yellow-500 hover:shadow-yellow-200"
+          : ""
       }`}
       style={{
-        width: width,
-        height: height,
+        width: data.width || 120,
+        height: data.height || 80,
         minWidth: 80,
         minHeight: 60,
+        background: "transparent",
+        border: "none",
+        boxShadow: "none",
+        padding: 0,
       }}
       onClick={handleNodeClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Triangle Shape using CSS clip-path */}
-      <div
-        className={`absolute inset-0 border-2 ${
-          selected
-            ? "border-purple-500 shadow-lg bg-purple-100"
-            : "border-purple-300 bg-purple-100"
-        }`}
-        style={{
-          clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
-          width: width * 0.8,
-          height: height * 0.8,
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-        }}
-      />{" "}
+      {/* SVG Triangle Outline */}
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        className="absolute left-0 top-0 z-0 pointer-events-none"
+        style={{ width: width, height: height }}
+      >
+        <polygon
+          points={`${width / 2},0 ${width},${height} 0,${height}`}
+          fill={selected ? "#f3e8ff" : "#faf5ff"}
+          stroke="#a21caf"
+          strokeWidth={selected ? 3 : 2}
+        />
+      </svg>
       {/* Connection Handles */}
       {["top", "right", "bottom", "left"].map((handleId) => {
         const position =
@@ -190,8 +267,54 @@ const TriangleNode: React.FC<TriangleNodeProps> = ({ id, data, selected }) => {
         );
       })}
       {/* Content */}
-      <div className="text-center text-sm font-medium text-gray-700 relative z-20 pointer-events-none">
-        {data.label || "Triangle"}
+      <div className="absolute inset-0 flex items-center justify-center z-10">
+        {isEditing ? (
+          <textarea
+            ref={inputRef}
+            className="rounded px-1 py-0.5 border border-yellow-300 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-200 text-sm resize-none bg-transparent z-20"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                saveEdit();
+              }
+              if (e.key === "Escape") {
+                setIsEditing(false);
+                setEditValue(data.label || "Triangle");
+              }
+            }}
+            rows={1}
+            style={{ minWidth: 40, maxWidth: (data.width || 120) - 32 }}
+          />
+        ) : (
+          <>
+            <span
+              className="pointer-events-auto cursor-text"
+              onDoubleClick={() => setIsEditing(true)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setIsEditing(true);
+              }}
+              aria-label="Edit label"
+            >
+              {data.label || "Triangle"}
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-5 w-5 p-0 ml-1 text-yellow-600 hover:bg-yellow-100 focus:bg-yellow-200 focus:outline-none z-20"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
+              tabIndex={0}
+              aria-label="Edit label"
+            >
+              <Pencil />
+            </Button>
+          </>
+        )}
       </div>
       {/* Delete button - only show when selected */}
       {selected && (
@@ -214,10 +337,7 @@ const TriangleNode: React.FC<TriangleNodeProps> = ({ id, data, selected }) => {
               borderRadius: "0 0 4px 0",
               transform: "translate(50%, 50%)",
             }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              // Resize logic will be implemented later
-            }}
+            onMouseDown={handleResizeMouseDown}
           />
         </>
       )}

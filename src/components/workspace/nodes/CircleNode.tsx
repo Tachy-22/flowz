@@ -1,9 +1,9 @@
 "use client";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Handle, Position, useReactFlow } from "reactflow";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 
 // Circle Node Component
 interface CircleNodeProps {
@@ -29,6 +29,9 @@ const CircleNode: React.FC<CircleNodeProps> = ({ id, data, selected }) => {
   } = useDiagramStore();
 
   const [isHovered, setIsHovered] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(data.label || "Circle");
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Get React Flow functions from context
   const { setNodes, setEdges } = useReactFlow();
@@ -104,7 +107,76 @@ const CircleNode: React.FC<CircleNodeProps> = ({ id, data, selected }) => {
     edges.some((edge) => edge.source === id || edge.target === id);
 
   const diameter = Math.min(data.width || 120, data.height || 120);
-  
+
+  // Resizing state and logic
+  const resizeStart = useRef<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // Mouse down on resize handle
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: data.width || diameter,
+      height: data.height || diameter,
+    };
+    window.addEventListener("mousemove", handleResizeMouseMove);
+    window.addEventListener("mouseup", handleResizeMouseUp);
+  };
+
+  // Mouse move while resizing
+  const handleResizeMouseMove = (e: MouseEvent) => {
+    if (!resizeStart.current) return;
+    const dx = e.clientX - resizeStart.current.x;
+    const dy = e.clientY - resizeStart.current.y;
+    // Keep the node a circle (equal width/height)
+    const newDiameter = Math.max(
+      40,
+      Math.max(resizeStart.current.width + dx, resizeStart.current.height + dy)
+    );
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, width: newDiameter, height: newDiameter },
+            }
+          : node
+      )
+    );
+  };
+
+  // Mouse up to finish resizing
+  const handleResizeMouseUp = () => {
+    resizeStart.current = null;
+    window.removeEventListener("mousemove", handleResizeMouseMove);
+    window.removeEventListener("mouseup", handleResizeMouseUp);
+  };
+
+  // Focus textarea when editing
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  // Save label edit
+  const saveEdit = useCallback(() => {
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? { ...node, data: { ...node.data, label: editValue } }
+          : node
+      )
+    );
+    setIsEditing(false);
+  }, [editValue, id, setNodes]);
 
   return (
     <div
@@ -125,7 +197,6 @@ const CircleNode: React.FC<CircleNodeProps> = ({ id, data, selected }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {" "}
       {/* Connection Handles */}
       {["top", "right", "bottom", "left"].map((handleId) => {
         const position =
@@ -179,8 +250,54 @@ const CircleNode: React.FC<CircleNodeProps> = ({ id, data, selected }) => {
         );
       })}
       {/* Content */}
-      <div className="text-center text-sm font-medium text-gray-700 relative z-10 pointer-events-none">
-        {data.label || "Circle"}
+      <div className="text-center text-sm font-medium text-gray-700 relative z-10 flex items-center justify-center gap-1">
+        {isEditing ? (
+          <textarea
+            ref={inputRef}
+            className="rounded px-1 py-0.5 border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 text-sm resize-none bg-transparent z-20"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                saveEdit();
+              }
+              if (e.key === "Escape") {
+                setIsEditing(false);
+                setEditValue(data.label || "Circle");
+              }
+            }}
+            rows={1}
+            style={{ minWidth: 40, maxWidth: diameter - 32 }}
+          />
+        ) : (
+          <>
+            <span
+              className="pointer-events-auto cursor-text"
+              onDoubleClick={() => setIsEditing(true)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setIsEditing(true);
+              }}
+              aria-label="Edit label"
+            >
+              {data.label || "Circle"}
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-5 w-5 p-0 ml-1 text-green-600 hover:bg-green-100 focus:bg-green-200 focus:outline-none z-20 group-hover:opacity-100 opacity-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
+              tabIndex={0}
+              aria-label="Edit label"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </>
+        )}
       </div>
       {/* Delete button - only show when selected */}
       {selected && (
@@ -203,10 +320,7 @@ const CircleNode: React.FC<CircleNodeProps> = ({ id, data, selected }) => {
               borderRadius: "0 0 4px 0",
               transform: "translate(50%, 50%)",
             }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              // Resize logic will be implemented later
-            }}
+            onMouseDown={handleResizeMouseDown}
           />
         </>
       )}

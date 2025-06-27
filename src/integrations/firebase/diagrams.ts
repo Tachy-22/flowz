@@ -424,4 +424,46 @@ export const diagramService = {
       }
     );
   },
+
+  // Get all public diagrams (allowedUsers: 'all')
+  getPublicDiagrams: async (
+    filters: {
+      allowedUsers?: string;
+      limit?: number;
+      orderBy?: "createdAt" | "updatedAt" | "title";
+      orderDirection?: "asc" | "desc";
+    } = {}
+  ): Promise<DiagramMeta[]> => {
+    try {
+      const diagramsRef = collection(firestore, DIAGRAMS_COLLECTION);
+      let q = query(
+        diagramsRef,
+        where("allowedUsers", "array-contains", filters.allowedUsers || "all")
+      );
+      // Apply ordering
+      const orderByField = filters.orderBy || "updatedAt";
+      const orderDirection = filters.orderDirection || "desc";
+      q = query(q, orderBy(orderByField, orderDirection));
+      // Apply limit
+      if (filters.limit) {
+        q = query(q, limit(filters.limit));
+      }
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || "Untitled Diagram",
+          description: data.description || "",
+          owner: data.owner,
+          createdAt: convertTimestamp(data.createdAt),
+          updatedAt: convertTimestamp(data.updatedAt),
+        };
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to get public diagrams: ${(error as Error).message}`
+      );
+    }
+  },
 };

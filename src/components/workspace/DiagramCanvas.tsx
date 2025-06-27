@@ -8,10 +8,7 @@ import ReactFlow, {
   Connection,
   NodeChange,
   EdgeChange,
-  ReactFlowProvider,
   Background,
-  Controls,
-  MiniMap,
   useReactFlow,
   Position,
   ConnectionLineType,
@@ -24,7 +21,7 @@ import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 
 import { Node as DiagramNode, Edge as DiagramEdge } from "@/types/diagram";
 
-import { getShapeTool, panTool, type ShapeType } from "./tools";
+import { getShapeTool, type ShapeType, textTool, drawTool } from "./tools";
 import { nodeTypes } from "./nodes";
 
 // Custom Deletable Edge Component
@@ -257,6 +254,8 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     setSelectedEdgeId,
     shouldAddRectangle,
     resetAddRectangleFlag,
+    shouldAddText,
+    resetAddTextFlag,
     setActiveTool,
     activeTool,
     isConnecting,
@@ -265,6 +264,8 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     connectionPreview,
     updateConnectionPreview,
     endConnection,
+    shouldAddDraw,
+    resetAddDrawFlag,
   } = useDiagramStore();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project, fitView } = useReactFlow();
@@ -509,55 +510,64 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
   ]); // Handle mouse down on pane (start drawing or cancel connection)
   const onPaneMouseDown = useCallback(
     (event: React.MouseEvent) => {
-      // Handle pan tool - just track that we started panning, let React Flow handle it
-      if (activeTool === "pan") {
-        panTool.startPanning({ x: event.clientX, y: event.clientY });
-        console.log("🤚 Pan tool: Started panning");
-        // Don't prevent default - let React Flow handle the panning
-        return;
-      }
-
       // Cancel connection if clicking on pane
       if (activeTool === "connection" && isConnecting) {
         endConnection();
         console.log("🔗 Connection cancelled");
         return;
       }
-
-      if (shouldAddRectangle && reactFlowWrapper.current) {
-        // Get coordinates relative to the ReactFlow container
+      // Text tool drawing
+      if (shouldAddText && reactFlowWrapper.current) {
         const rect = reactFlowWrapper.current.getBoundingClientRect();
         const screenPosition = {
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
         };
-
-        // Use React Flow's project method to convert to flow coordinates
         const flowPosition = project(screenPosition);
-
-        // Get the appropriate shape tool based on active tool
+        textTool.startDrawing(flowPosition, screenPosition);
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      // Draw tool drawing
+      if (shouldAddDraw && reactFlowWrapper.current) {
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        const screenPosition = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        const flowPosition = project(screenPosition);
+        drawTool.startDrawing(flowPosition, screenPosition);
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      // Shape tool drawing
+      if (shouldAddRectangle && reactFlowWrapper.current) {
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        const screenPosition = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        const flowPosition = project(screenPosition);
         const currentShapeTool = getShapeTool(activeTool as ShapeType);
         currentShapeTool.startDrawing(flowPosition, screenPosition);
-        console.log(
-          `🎨 Started drawing ${activeTool} at flow coordinates:`,
-          flowPosition
-        );
-
-        // Prevent panning while drawing
         event.preventDefault();
         event.stopPropagation();
       }
     },
-    [shouldAddRectangle, project, activeTool, isConnecting, endConnection]
+    [
+      shouldAddRectangle,
+      shouldAddText,
+      shouldAddDraw,
+      project,
+      activeTool,
+      isConnecting,
+      endConnection,
+    ]
   ); // Handle mouse move (update drawing preview)
   const onPaneMouseMove = useCallback(
     (event: React.MouseEvent) => {
-      // Handle pan tool movement - just track that we're panning
-      if (activeTool === "pan" && panTool.isActive()) {
-        // Let React Flow handle the actual panning, we just track state
-        return;
-      }
-
       // Handle connection preview
       if (
         activeTool === "connection" &&
@@ -573,23 +583,44 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         updateConnectionPreview(flowPosition);
       }
 
-      // Handle shape drawing
-      if (shouldAddRectangle && reactFlowWrapper.current) {
-        // Get coordinates relative to the ReactFlow container
+      // Text tool drawing
+      if (shouldAddText && reactFlowWrapper.current) {
         const rect = reactFlowWrapper.current.getBoundingClientRect();
         const screenPosition = {
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
         };
-
-        // Use React Flow's project method to convert to flow coordinates
         const flowPosition = project(screenPosition);
-
-        // Get the appropriate shape tool based on active tool
+        if (textTool.isActive()) {
+          textTool.updateDrawing(flowPosition, screenPosition);
+          forceRerender();
+        }
+      }
+      // Draw tool drawing
+      if (shouldAddDraw && reactFlowWrapper.current) {
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        const screenPosition = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        const flowPosition = project(screenPosition);
+        if (drawTool.isActive()) {
+          drawTool.updateDrawing(flowPosition, screenPosition);
+          forceRerender();
+        }
+      }
+      // Shape tool drawing
+      if (shouldAddRectangle && reactFlowWrapper.current) {
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        const screenPosition = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        const flowPosition = project(screenPosition);
         const currentShapeTool = getShapeTool(activeTool as ShapeType);
         if (currentShapeTool.isActive()) {
           currentShapeTool.updateDrawing(flowPosition, screenPosition);
-          forceRerender(); // Trigger re-render for preview update
+          forceRerender();
         }
       }
     },
@@ -600,45 +631,62 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       isConnecting,
       updateConnectionPreview,
       shouldAddRectangle,
+      shouldAddText,
+      shouldAddDraw,
     ]
   ); // Handle mouse up (finish drawing or panning)
   const onPaneMouseUp = useCallback(() => {
-    // Handle pan tool finish
-    if (activeTool === "pan" && panTool.isActive()) {
-      panTool.stopPanning();
-      setActiveTool("select"); // Switch back to select tool after panning
-      console.log("🤚 Pan tool: Finished panning, switched to select tool");
+    // Text tool drawing
+    if (shouldAddText) {
+      if (textTool.isActive()) {
+        const newNode = textTool.finishDrawing();
+        if (newNode) {
+          setFlowNodes((nodes) => [...nodes, newNode]);
+          setSelectedNodeId(newNode.id);
+          console.log("✅ text node created successfully");
+        }
+        resetAddTextFlag();
+        setActiveTool("select");
+      }
       return;
     }
-
+    // Draw tool drawing
+    if (shouldAddDraw) {
+      if (drawTool.isActive()) {
+        const newNode = drawTool.finishDrawing();
+        if (newNode) {
+          setFlowNodes((nodes) => [...nodes, newNode]);
+          setSelectedNodeId(newNode.id);
+          console.log("✅ draw node created successfully");
+        }
+        resetAddDrawFlag();
+        setActiveTool("select");
+      }
+      return;
+    }
+    // Shape tool drawing
     if (shouldAddRectangle) {
-      // Get the appropriate shape tool based on active tool
       const currentShapeTool = getShapeTool(activeTool as ShapeType);
-
       if (currentShapeTool.isActive()) {
         const newNode = currentShapeTool.finishDrawing();
-
         if (newNode) {
-          // Add to React Flow (primary source of truth)
           setFlowNodes((nodes) => [...nodes, newNode]);
-
-          // Select the new node
           setSelectedNodeId(newNode.id);
-
           console.log(`✅ ${activeTool} created successfully`);
         }
-
-        // Switch back to move tool in both flags and UI
         resetAddRectangleFlag();
         setActiveTool("select");
       }
     }
   }, [
     shouldAddRectangle,
+    shouldAddText,
     activeTool,
     setFlowNodes,
     setSelectedNodeId,
     resetAddRectangleFlag,
+    resetAddTextFlag,
+    resetAddDrawFlag,
     setActiveTool,
   ]);
   const handleNodesChange = useCallback(
@@ -751,35 +799,50 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         }}
       >
         {" "}
-        <Background />
-        <Controls />
-        <MiniMap />{" "}
+        <Background  />{" "}
+        {/* <Controls />
+        <MiniMap /> */}{" "}
         {/* Drawing Preview Overlay - positioned using screen coordinates */}
         {(() => {
-          if (!shouldAddRectangle) return null;
-
-          // Get the appropriate shape tool based on active tool
-          const currentShapeTool = getShapeTool(activeTool as ShapeType);
-          const previewBounds = currentShapeTool.getPreviewScreenBounds();
-
-          return previewBounds ? (
-            <div
-              className={`absolute pointer-events-none border-2 border-blue-500 bg-blue-100 bg-opacity-50 ${
-                activeTool === "circle"
-                  ? "rounded-full"
-                  : activeTool === "diamond"
-                  ? "transform rotate-45"
-                  : ""
-              }`}
-              style={{
-                left: previewBounds.x,
-                top: previewBounds.y,
-                width: previewBounds.width,
-                height: previewBounds.height,
-                zIndex: 1000,
-              }}
-            />
-          ) : null;
+          if (shouldAddRectangle) {
+            // Get the appropriate shape tool based on active tool
+            const currentShapeTool = getShapeTool(activeTool as ShapeType);
+            const previewBounds = currentShapeTool.getPreviewScreenBounds();
+            return previewBounds ? (
+              <div
+                className={`absolute pointer-events-none border-2 border-blue-500 bg-blue-100 bg-opacity-50 ${
+                  activeTool === "circle"
+                    ? "rounded-full"
+                    : activeTool === "diamond"
+                    ? "transform rotate-45"
+                    : ""
+                }`}
+                style={{
+                  left: previewBounds.x,
+                  top: previewBounds.y,
+                  width: previewBounds.width,
+                  height: previewBounds.height,
+                  zIndex: 1000,
+                }}
+              />
+            ) : null;
+          }
+          if (shouldAddDraw) {
+            const previewBounds = drawTool.getPreviewScreenBounds();
+            return previewBounds ? (
+              <div
+                className="absolute pointer-events-none border-2 border-purple-500 bg-purple-100 bg-opacity-50"
+                style={{
+                  left: previewBounds.x,
+                  top: previewBounds.y,
+                  width: previewBounds.width,
+                  height: previewBounds.height,
+                  zIndex: 1000,
+                }}
+              />
+            ) : null;
+          }
+          return null;
         })()}
         {/* Connection Preview Overlay */}
         {isConnecting &&
@@ -895,11 +958,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
 
 // Wrap with ReactFlowProvider
 const DiagramCanvasProvider: React.FC<DiagramCanvasProps> = (props) => {
-  return (
-    <ReactFlowProvider>
-      <DiagramCanvas {...props} />
-    </ReactFlowProvider>
-  );
+  return <DiagramCanvas {...props} />;
 };
 
 export default DiagramCanvasProvider;

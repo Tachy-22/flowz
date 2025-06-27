@@ -1,10 +1,3 @@
-// export {
-//   RectangleTool,
-//   rectangleTool,
-//   type DrawingState,
-//   type RectangleToolOptions,
-// } from "./RectangleTool";
-
 export {
   ConnectionTool,
   connectionTool,
@@ -12,12 +5,7 @@ export {
   type ConnectionToolOptions,
 } from "./ConnectionTool";
 
-export {
-  PanTool,
-  panTool,
-  type PanState,
-  type PanToolOptions,
-} from "./PanTool";
+export { TextTool, textTool, type TextToolOptions } from "./TextTool";
 
 export {
   ShapeTool,
@@ -30,6 +18,8 @@ export {
   type ShapeData,
   type ShapeToolOptions,
 } from "./ShapeTool";
+
+export { DrawTool, drawTool, type DrawToolOptions } from "./DrawTool";
 
 // Future tools can be exported here
 // export { CircleTool, circleTool } from './CircleTool';

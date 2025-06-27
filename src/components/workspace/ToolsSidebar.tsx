@@ -15,9 +15,8 @@ import {
   Circle,
   Triangle,
   Diamond,
-  ArrowRight,
   Type,
-  Image,
+  //Image,
   Pen,
   Move,
   MousePointer,
@@ -33,6 +32,12 @@ import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { useUserStore } from "@/integrations/zustand";
 import { diagramService } from "@/integrations/firebase/diagrams";
 import { DiagramMeta } from "@/types/diagram";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ToolsSidebarProps {
   onClose: () => void;
@@ -43,6 +48,8 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
     activeTool,
     setActiveTool,
     triggerAddRectangle,
+    triggerAddText, // <-- add this
+    triggerAddDraw, // <-- add this
     setDiagramId,
     setDiagramTitle,
     setNodes,
@@ -52,6 +59,12 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
   const { user } = useUserStore();
   const [recentDiagrams, setRecentDiagrams] = useState<DiagramMeta[]>([]);
   const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
+  // Fetch public templates (diagrams with allowedUsers: 'all')
+  const [publicTemplates, setPublicTemplates] = useState<DiagramMeta[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+
   // Load recent diagrams
   const loadRecentDiagrams = async () => {
     if (!user) return;
@@ -76,6 +89,8 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
   // Create new diagram
   const createNewDiagram = () => {
     resetDiagram();
+    setDiagramId("");
+
     console.log("📝 Created new diagram");
   }; // Load a specific diagram
   const loadDiagram = async (diagramMeta: DiagramMeta) => {
@@ -117,42 +132,38 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
         setActiveTool("select");
         break;
       case "Rectangle":
-        console.log("📦 Rectangle tool selected, triggering add rectangle");
         setActiveTool("rectangle");
         triggerAddRectangle();
-        console.log("✅ triggerAddRectangle called");
         break;
       case "Connection":
-        console.log("🔗 Connection tool selected");
         setActiveTool("connection");
         break;
       case "Pan":
-        console.log("🤚 Pan tool selected");
         setActiveTool("pan");
         break;
       case "Circle":
-        console.log("⭕ Circle tool selected, triggering add shape");
         setActiveTool("circle");
-        triggerAddRectangle(); // This will trigger shape drawing mode
-        console.log("✅ Circle tool activated");
+        triggerAddRectangle();
         break;
       case "Diamond":
-        console.log("💎 Diamond tool selected, triggering add shape");
         setActiveTool("diamond");
-        triggerAddRectangle(); // This will trigger shape drawing mode
-        console.log("✅ Diamond tool activated");
+        triggerAddRectangle();
         break;
       case "Triangle":
-        console.log("🔺 Triangle tool selected, triggering add shape");
         setActiveTool("triangle");
-        triggerAddRectangle(); // This will trigger shape drawing mode
-        console.log("✅ Triangle tool activated");
+        triggerAddRectangle();
         break;
       case "Arrow":
         setActiveTool("arrow");
         break;
       case "Text":
         setActiveTool("text");
+
+        triggerAddText();
+        break;
+      case "Draw":
+        setActiveTool("draw");
+        triggerAddDraw();
         break;
       default:
         setActiveTool("select");
@@ -172,17 +183,14 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
     { icon: Diamond, label: "Diamond", category: "shapes" },
   ];
 
-  const flowElements = [
-    { icon: Square, label: "Process", category: "flow" },
-    { icon: Diamond, label: "Decision", category: "flow" },
-    { icon: Circle, label: "Start/End", category: "flow" },
-    { icon: ArrowRight, label: "Arrow", category: "flow" },
-  ];
+  // const flowElements = [
+  //   { icon: ArrowRight, label: "Arrow", category: "flow" },
+  //   { icon: ArrowLeft, label: "Arrow", category: "flow" },
+  // ];
 
   const otherTools = [
     { icon: Type, label: "Text", category: "other" },
     { icon: Pen, label: "Draw", category: "other" },
-    { icon: Image, label: "Image", category: "other" },
   ];
 
   const ToolSection = ({
@@ -201,10 +209,10 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
           <Button
             key={index}
             variant="ghost"
-            className={`h-12 flex flex-col items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${
+            className={`h-fit p-4 flex flex-col items-center justify-center text-gray-600 hover:text-gray-900  ${
               activeTool === item.label.toLowerCase()
                 ? "bg-blue-100 text-blue-700"
-                : ""
+                : " hover:bg-gray-100"
             }`}
             onClick={() => handleToolClick(item.label)}
           >
@@ -215,6 +223,26 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
       </div>
     </div>
   );
+
+  // Fetch public templates (diagrams with allowedUsers: 'all')
+  const fetchPublicTemplates = async () => {
+    setIsLoadingTemplates(true);
+    setTemplatesError(null);
+    try {
+      // You may need to implement this method in your diagramService if not present
+      const templates = await diagramService.getPublicDiagrams({
+        allowedUsers: "all",
+        orderBy: "updatedAt",
+        orderDirection: "desc",
+        limit: 50,
+      });
+      setPublicTemplates(templates);
+    } catch {
+      setTemplatesError("Failed to load templates.");
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -294,15 +322,72 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
       <div className="flex-1 overflow-y-auto p-4">
         <ToolSection title="Tools" items={tools} />
         <ToolSection title="Basic Shapes" items={shapes} />
-        <ToolSection title="Flow Elements" items={flowElements} />
         <ToolSection title="Other" items={otherTools} />
       </div>
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-200">
-        <Button variant="outline" className="w-full text-sm">
+        <Button
+          variant="outline"
+          className="w-full text-sm"
+          onClick={() => {
+            setShowTemplatesDialog(true);
+            fetchPublicTemplates();
+          }}
+        >
           Browse Templates
         </Button>
+        <Dialog
+          open={showTemplatesDialog}
+          onOpenChange={setShowTemplatesDialog}
+        >
+          <DialogContent className="max-w-3xl w-full">
+            <DialogHeader>
+              <DialogTitle>Browse Templates</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              {isLoadingTemplates ? (
+                <div className="text-center text-gray-500 py-4">
+                  Loading templates...
+                </div>
+              ) : templatesError ? (
+                <div className="text-center text-red-500 py-4">
+                  {templatesError}
+                </div>
+              ) : publicTemplates.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">
+                  No public templates found.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[32rem] overflow-y-auto">
+                  {publicTemplates.map((template) => (
+                    <div
+                      key={template.id}
+                      className="flex flex-col items-center p-2 border rounded-lg cursor-pointer hover:shadow-md hover:bg-gray-50 transition group"
+                      onClick={() => loadDiagram(template)}
+                    >
+                      <div className="w-full aspect-video bg-gray-100 rounded mb-2 overflow-hidden flex items-center justify-center">
+                        {template.description ? (
+                          <img
+                            src={template.description}
+                            alt={template.title || "Template"}
+                            className="object-cover w-full h-full group-hover:scale-105 transition-transform"
+                            style={{ maxHeight: 140, minHeight: 80 }}
+                          />
+                        ) : (
+                          <div className="text-xs text-gray-400">No image</div>
+                        )}
+                      </div>
+                      <span className="font-medium text-gray-900 text-center truncate w-full">
+                        {template.title || "Untitled"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

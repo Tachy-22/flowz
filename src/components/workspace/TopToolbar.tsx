@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { User as UserType } from "@/integrations/firebase/auth";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
+import { useReactFlow } from "reactflow";
 
 interface TopToolbarProps {
   user: UserType | null;
@@ -48,6 +49,31 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
   const [editTitle, setEditTitle] = useState(
     diagramTitle || "Untitled Diagram"
   );
+  const reactFlowInstance = useReactFlow();
+  const [zoom, setZoom] = useState(1);
+
+  // Keep zoom state in sync with React Flow
+  React.useEffect(() => {
+    if (reactFlowInstance && typeof reactFlowInstance.getZoom === "function") {
+      setZoom(Number(reactFlowInstance.getZoom().toFixed(2)));
+    }
+    // Listen for zoom changes if needed
+    // Optionally, you can add a listener to update zoom state on zoom events
+  }, [reactFlowInstance]);
+
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => {
+    if (reactFlowInstance && typeof reactFlowInstance.zoomIn === "function") {
+      reactFlowInstance.zoomIn();
+      setZoom((z) => Math.min(z + 0.1, 2));
+    }
+  }, [reactFlowInstance]);
+  const handleZoomOut = useCallback(() => {
+    if (reactFlowInstance && typeof reactFlowInstance.zoomOut === "function") {
+      reactFlowInstance.zoomOut();
+      setZoom((z) => Math.max(z - 0.1, 0.2));
+    }
+  }, [reactFlowInstance]);
 
   // Keep editTitle in sync with diagramTitle when not editing
   React.useEffect(() => {
@@ -189,11 +215,23 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
         <div className="w-px h-6 bg-gray-300"></div>
         {/* Zoom Actions */}
         <div className="flex items-center space-x-1">
-          <Button variant="ghost" size="sm" className="h-8 px-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={handleZoomOut}
+          >
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-sm text-gray-600 px-2">100%</span>
-          <Button variant="ghost" size="sm" className="h-8 px-2">
+          <span className="text-sm text-gray-600 px-2">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={handleZoomIn}
+          >
             <ZoomIn className="h-4 w-4" />
           </Button>
         </div>

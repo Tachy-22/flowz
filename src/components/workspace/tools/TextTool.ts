@@ -1,10 +1,13 @@
 import { Node } from "reactflow";
 
-export interface DrawToolOptions {
+export interface TextToolOptions {
   defaultWidth?: number;
   defaultHeight?: number;
   minWidth?: number;
   minHeight?: number;
+  fontSize?: number;
+  fontWeight?: string;
+  textAlign?: "left" | "center" | "right";
   snapToGrid?: boolean;
   gridSize?: number;
 }
@@ -21,20 +24,23 @@ export interface Bounds {
   height: number;
 }
 
-export class DrawTool {
+export class TextTool {
   private isDrawing: boolean = false;
   private startPosition: Position | null = null;
   private currentPosition: Position | null = null;
   private startScreenPosition: Position | null = null;
   private currentScreenPosition: Position | null = null;
-  private options: Required<DrawToolOptions>;
+  private options: Required<TextToolOptions>;
 
-  constructor(options: DrawToolOptions) {
+  constructor(options: TextToolOptions) {
     this.options = {
       defaultWidth: options.defaultWidth ?? 200,
-      defaultHeight: options.defaultHeight ?? 150,
+      defaultHeight: options.defaultHeight ?? 100,
       minWidth: options.minWidth ?? 100,
-      minHeight: options.minHeight ?? 80,
+      minHeight: options.minHeight ?? 40,
+      fontSize: options.fontSize ?? 14,
+      fontWeight: options.fontWeight ?? "normal",
+      textAlign: options.textAlign ?? "left",
       snapToGrid: options.snapToGrid ?? true,
       gridSize: options.gridSize ?? 20,
     };
@@ -150,17 +156,21 @@ export class DrawTool {
   }
 
   private createNodeFromBounds(bounds: Bounds): Node {
-    const nodeId = `draw-${Date.now()}-${Math.random()
+    const nodeId = `text-${Date.now()}-${Math.random()
       .toString(36)
       .substr(2, 9)}`;
     return {
       id: nodeId,
-      type: "draw",
+      type: "text",
       position: { x: bounds.x, y: bounds.y },
       data: {
-        paths: [],
+        text: "Enter text...",
+        label: "Enter text...",
         width: bounds.width,
         height: bounds.height,
+        fontSize: this.options.fontSize,
+        fontWeight: this.options.fontWeight,
+        textAlign: this.options.textAlign,
       },
       draggable: true,
       selectable: true,
@@ -170,4 +180,4 @@ export class DrawTool {
   }
 }
 
-export const drawTool = new DrawTool({});
+export const textTool = new TextTool({});

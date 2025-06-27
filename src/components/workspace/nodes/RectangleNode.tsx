@@ -1,9 +1,9 @@
 "use client";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useRef } from "react";
 import { useReactFlow, Handle, Position } from "reactflow";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 
 // Custom Rectangle Node Component
 interface RectangleNodeProps {
@@ -28,6 +28,9 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
   } = useDiagramStore();
 
   const [isHovered, setIsHovered] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(data.label || "");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Get React Flow functions from context
   const { setNodes, setEdges } = useReactFlow();
@@ -110,6 +113,95 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
       hasConnections(handleId)
     );
 
+  // Resizing state and logic
+  const resizeStart = useRef<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // Mouse down on resize handle
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: data.width || 120,
+      height: data.height || 80,
+    };
+    window.addEventListener("mousemove", handleResizeMouseMove);
+    window.addEventListener("mouseup", handleResizeMouseUp);
+  };
+
+  // Mouse move while resizing
+  const handleResizeMouseMove = (e: MouseEvent) => {
+    if (!resizeStart.current) return;
+    const dx = e.clientX - resizeStart.current.x;
+    const dy = e.clientY - resizeStart.current.y;
+    const newWidth = Math.max(40, resizeStart.current.width + dx);
+    const newHeight = Math.max(30, resizeStart.current.height + dy);
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, width: newWidth, height: newHeight },
+            }
+          : node
+      )
+    );
+  };
+
+  // Mouse up to finish resizing
+  const handleResizeMouseUp = () => {
+    resizeStart.current = null;
+    window.removeEventListener("mousemove", handleResizeMouseMove);
+    window.removeEventListener("mouseup", handleResizeMouseUp);
+  };
+
+  // Focus input when editing
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  // Save label
+  const saveLabel = () => {
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? { ...node, data: { ...node.data, label: editValue } }
+          : node
+      )
+    );
+    setIsEditing(false);
+  };
+
+  // Handle double click or edit icon
+  const handleEditStart = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) e.stopPropagation();
+    setEditValue(data.label || "");
+    setIsEditing(true);
+  };
+
+  // Handle input blur or Enter
+  const handleInputBlur = () => saveLabel();
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") saveLabel();
+    if (e.key === "Escape") setIsEditing(false);
+  };
+
+  // When entering edit mode, auto-size the textarea to fill the container
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.style.height = "0px";
+      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+    }
+  }, [isEditing, editValue]);
+
   return (
     <div
       className={`bg-blue-100 border-2 rounded-lg p-4 relative group cursor-move ${
@@ -190,8 +282,40 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
         })}
       {/* Drag handle - invisible but covers the whole node */}
       <div className="absolute inset-0 cursor-move" />
-      <div className="text-center text-sm font-medium text-gray-700 relative z-10 pointer-events-none">
-        {data.label || "Rectangle"}
+      <div
+        className="text-center text-sm font-medium text-gray-700 relative z-10"
+        style={{ minHeight: 24 }}
+        onDoubleClick={handleEditStart}
+        onTouchStart={(e) => {
+          if (e.detail === 2) handleEditStart(e); // double tap
+        }}
+      >
+        {isEditing ? (
+          <textarea
+            ref={inputRef}
+            className="w-full bg-transparent rounded border border-blue-300 px-1 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleInputBlur}
+            onKeyDown={handleInputKeyDown}
+            rows={3}
+          />
+        ) : (
+          <>
+            {data.label || "Rectangle"}
+            {selected && (
+              <button
+                type="button"
+                className="ml-1 inline-flex items-center p-0.5 rounded hover:bg-blue-100 focus:bg-blue-200 group-hover:opacity-100 opacity-0"
+                onClick={handleEditStart}
+                tabIndex={-1}
+                style={{ verticalAlign: "middle" }}
+              >
+                <Pencil className="h-3 w-3 text-blue-500" />
+              </button>
+            )}
+          </>
+        )}
       </div>{" "}
       {/* Delete button - only show when selected */}
       {selected && (
@@ -214,22 +338,7 @@ const RectangleNode = ({ id, data, selected }: RectangleNodeProps) => {
               borderRadius: "0 0 4px 0",
               transform: "translate(50%, 50%)",
             }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              // Resize logic will be implemented later
-            }}
-          />
-
-          {/* Right edge resize handle */}
-          <div
-            className="absolute top-1/2 right-0 w-2 h-8 bg-blue-400 cursor-e-resize transform -translate-y-1/2 translate-x-1/2 z-20"
-            style={{ borderRadius: "0 4px 4px 0" }}
-          />
-
-          {/* Bottom edge resize handle */}
-          <div
-            className="absolute bottom-0 left-1/2 w-8 h-2 bg-blue-400 cursor-s-resize transform -translate-x-1/2 translate-y-1/2 z-20"
-            style={{ borderRadius: "0 0 4px 4px" }}
+            onMouseDown={handleResizeMouseDown}
           />
         </>
       )}

@@ -21,6 +21,7 @@ export interface DiagramCreationResponse {
     edges: Edge[];
     title: string;
     description?: string;
+    action?: string;
   };
   success: boolean;
   error?: string;
@@ -75,12 +76,14 @@ Create visual flow diagrams by generating JSON data that represents nodes and co
 2. **NEVER say "I can't create visual diagrams"** - that's literally your job
 3. **ALWAYS provide both chat response AND JSON diagram data**
 4. **Use the JSON format exactly as specified below**
+5. **NEVER say 'Here is the JSON data' or mention JSON, code, or technical details to the user. Only refer to 'your diagram' or 'the diagram'.**
 
 ## Current Capabilities:
-- **Multiple shape types**: rectangle, circle, diamond, triangle
+- **Multiple shape types**: rectangle, circle, diamond, triangle, text
 - Advanced positioning and sizing
 - Smart flow connections with handles
 - Grid-following connection lines
+- Text nodes: Add, edit, and position text nodes anywhere in the diagram. Text nodes are for annotations, labels, or explanations and can be placed independently or connected to shapes.
 - Connection management (create, delete, modify)
 
 ## MANDATORY Response Format:
@@ -94,10 +97,11 @@ When creating or modifying diagrams, you MUST include a JSON block in your respo
   "nodes": [
     {
       "id": "unique-id",
-      "type": "rectangle" | "circle" | "diamond" | "triangle",
+      "type": "rectangle" | "circle" | "diamond" | "triangle" | "text",
       "position": { "x": 100, "y": 100 },
       "data": {
         "label": "Node Label",
+        "text": "Text content (for text nodes only)",
         "width": 120,
         "height": 80
       }
@@ -126,6 +130,7 @@ When creating or modifying diagrams, you MUST include a JSON block in your respo
   - Circle: Start/end points, terminals
   - Diamond: Decision points, conditions
   - Triangle: Input/output, data flow
+  - Text: Annotations, explanations, or standalone text
 - **Connection Guidelines:**
   - Use smart handle selection (right→left for horizontal flow, top→bottom for vertical)
   - Include sourceHandle and targetHandle for precise connections
@@ -139,12 +144,13 @@ When creating or modifying diagrams, you MUST include a JSON block in your respo
 - "Add a decision point" → Add a diamond labeled "Decision" with multiple output connections
 - "Make a flowchart for user login" → Create mixed shapes: circle (start), rectangles (processes), diamond (decisions)
 - "Create a data flow diagram" → Use triangles for data, rectangles for processes, circles for external entities
+- "Add a text annotation" → Add a text node with a helpful label or explanation, positioned near the relevant shape
 - "Connect the login box to the validation diamond" → Create edge with appropriate handles
 
 ## CRITICAL INSTRUCTION:
 If a user asks for ANY type of diagram, flowchart, process flow, architecture diagram, or visual representation, you MUST create the diagram JSON. Do not provide text descriptions instead of diagrams. Your job is to create actual visual diagrams that render in the tool.
 
-Remember: Always include both a helpful chat response AND diagram JSON when creating/modifying diagrams.`;
+Remember: Always include both a helpful chat response AND diagram JSON when creating/modifying diagrams. NEVER mention JSON, code, or technical details to the user. Only refer to 'your diagram' or 'the diagram'.`;
       const defaultHistory: ChatHistory[] = [
         {
           role: "user",
@@ -229,9 +235,7 @@ User request: ${request.prompt}`;
   }
 
   // Streaming version of processRequest
-  async *processRequestStream(
-    request: DiagramCreationRequest
-  ): AsyncGenerator<
+  async *processRequestStream(request: DiagramCreationRequest): AsyncGenerator<
     {
       chatResponse: string;
       diagramData?: DiagramCreationResponse["diagramData"];
@@ -395,6 +399,7 @@ User request: ${request.prompt}`;
         edges: validatedEdges,
         title: parsed.title || "AI Generated Diagram",
         description: parsed.description,
+        action: parsed.action,
       };
     } catch (error) {
       console.error("❌ Failed to extract diagram data:", error);

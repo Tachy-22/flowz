@@ -102,6 +102,24 @@
   }
 }
 
+html,
+body {
+  overflow: hidden;
+  /* Prevent scrollbars on the main viewport */
+}
+
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;

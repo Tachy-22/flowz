@@ -6,6 +6,8 @@ export type Tool =
   | "rectangle"
   | "triangle"
   | "circle"
+  | "draw"
+
   | "diamond"
   | "arrow"
   | "text"
@@ -36,6 +38,8 @@ interface DiagramState {
   // Tool state
   activeTool: Tool;
   shouldAddRectangle: boolean; // Flag to trigger rectangle addition
+  shouldAddText: boolean; // Flag to trigger text addition
+  shouldAddDraw: boolean; // Flag to trigger draw action
 
   // History for undo/redo
   history: HistoryState[];
@@ -67,6 +71,10 @@ interface DiagramState {
   setActiveTool: (tool: Tool) => void;
   triggerAddRectangle: () => void;
   resetAddRectangleFlag: () => void;
+  triggerAddText: () => void;
+  resetAddTextFlag: () => void;
+  triggerAddDraw: () => void;
+  resetAddDrawFlag: () => void;
   // Connection actions
   startConnection: (nodeId: string, handle?: string) => void;
   updateConnectionPreview: (position: { x: number; y: number }) => void;
@@ -111,6 +119,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   viewport: initialViewport,
   activeTool: "select",
   shouldAddRectangle: false,
+  shouldAddText: false,
+  shouldAddDraw: false,
   history: [],
   currentHistoryIndex: -1,
   isConnecting: false,
@@ -180,6 +190,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setActiveTool: (tool) => set({ activeTool: tool }),
   triggerAddRectangle: () => set({ shouldAddRectangle: true }),
   resetAddRectangleFlag: () => set({ shouldAddRectangle: false }),
+  triggerAddText: () => set({ shouldAddText: true }),
+  resetAddTextFlag: () => set({ shouldAddText: false }),
+  triggerAddDraw: () => set({ shouldAddDraw: true }),
+  resetAddDrawFlag: () => set({ shouldAddDraw: false }),
   // Connection actions
   startConnection: (nodeId, handle) =>
     set({
