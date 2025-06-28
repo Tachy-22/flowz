@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import {
   MessageSquare,
   Menu,
-  User,
+  // User,
   Settings,
   Save,
   Download,
   Upload,
-  Undo,
-  Redo,
+  // Undo,
+  // Redo,
   ZoomIn,
   ZoomOut,
   LogOut,
@@ -22,6 +22,22 @@ import {
 import { User as UserType } from "@/integrations/firebase/auth";
 import { useDiagramStore } from "@/integrations/zustand/useDiagramStore";
 import { useReactFlow } from "reactflow";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import * as htmlToImage from "html-to-image";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 interface TopToolbarProps {
   user: UserType | null;
@@ -51,6 +67,8 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
   );
   const reactFlowInstance = useReactFlow();
   const [zoom, setZoom] = useState(1);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Keep zoom state in sync with React Flow
   React.useEffect(() => {
@@ -114,17 +132,84 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
     [saveTitle, cancelEditTitle]
   );
 
+  // Export as image handler
+  const handleExportAsImage = async () => {
+    // Find the React Flow wrapper by class and cast to HTMLElement
+    const wrapper = document.querySelector(".react-flow") as HTMLElement | null;
+    if (!wrapper) {
+      alert("Could not find diagram canvas.");
+      return;
+    }
+    try {
+      const dataUrl = await htmlToImage.toPng(wrapper, {
+        backgroundColor: "#f9fafb",
+        pixelRatio: 2,
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `${diagramTitle || "diagram"}.png`;
+      document.body.appendChild(link); // Ensure it's in the DOM for Firefox
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export image.");
+    }
+  };
+
+  // Export as .fz handler
+  const handleExportAsFz = () => {
+    const { nodes, edges } = useDiagramStore.getState();
+    const data = JSON.stringify({
+      title: diagramTitle,
+      nodes,
+      edges,
+    });
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${diagramTitle || "diagram"}.fz`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Import .fz handler
+  const handleImportFz = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const { title, nodes, edges } = JSON.parse(
+          event.target?.result as string
+        );
+        useDiagramStore.getState().setDiagramTitle(title || "Imported Diagram");
+        useDiagramStore.getState().setNodes(nodes || []);
+        useDiagramStore.getState().setEdges(edges || []);
+        if (useDiagramStore.getState().setDiagramId) {
+          useDiagramStore.getState().setDiagramId("");
+        }
+        alert("Diagram imported successfully!");
+      } catch {
+        alert("Invalid .fz file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   return (
     <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
       {/* Left Section */}
       <div className="flex items-center space-x-4">
         {/* Logo */}
-        <div className="flex items-center space-x-2">
+        <Link  href="/" className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center">
             <span className="text-white font-bold text-sm">F</span>
           </div>
           <span className="font-semibold text-gray-900">Flowz</span>
-        </div>{" "}
+        </Link>{" "}
         {/* Diagram Title */}
         <div className="flex items-center space-x-2 text-gray-600">
           <span className="text-sm">|</span>
@@ -195,15 +280,49 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
               </span>
             )}
           </div>
-          <Button variant="ghost" size="sm" className="h-8 px-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            title="Import Flowz File (.fz)"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <Upload className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 px-2">
-            <Download className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center space-x-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  title="Export/Import"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={handleExportAsImage}>
+                  Export as Image (.png)
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={handleExportAsFz}>
+                  Export as Flowz File (.fz)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Hidden file input for .fz import */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".fz"
+              style={{ display: "none" }}
+              onChange={handleImportFz}
+            />
+          </div>
         </div>
-        <div className="w-px h-6 bg-gray-300"></div>
-        {/* Edit Actions */}
+        {/* <div className="w-px h-6 bg-gray-300"></div>
+        Edit Actions
         <div className="flex items-center space-x-1">
           <Button variant="ghost" size="sm" className="h-8 px-2">
             <Undo className="h-4 w-4" />
@@ -211,8 +330,8 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
           <Button variant="ghost" size="sm" className="h-8 px-2">
             <Redo className="h-4 w-4" />
           </Button>
-        </div>
-        <div className="w-px h-6 bg-gray-300"></div>
+        </div> */}
+           {/* <div className="w-px h-6 bg-gray-300"></div>
         {/* Zoom Actions */}
         <div className="flex items-center space-x-1">
           <Button
@@ -256,9 +375,19 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
 
         {/* User Info */}
         <div className="flex items-center space-x-2">
-          <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center">
-            <User className="h-4 w-4 text-gray-600" />
-          </div>
+          <Avatar className="w-7 h-7">
+            <AvatarImage
+              src={user?.photoURL || undefined}
+              alt={user?.displayName || user?.email || "User"}
+            />
+            <AvatarFallback>
+              {user?.displayName
+                ? user.displayName[0]
+                : user?.email
+                ? user.email[0]
+                : "U"}
+            </AvatarFallback>
+          </Avatar>
           <span className="text-sm text-gray-700 max-w-32 truncate">
             {user?.displayName || user?.email}
           </span>
@@ -272,13 +401,41 @@ const TopToolbar: React.FC<TopToolbarProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onSignOut}
+            onClick={() => setShowLogoutDialog(true)}
             className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
           >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
+      {/* Logout Confirmation Modal */}
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign out?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-gray-700">
+            Are you sure you want to log out?
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowLogoutDialog(false);
+                onSignOut();
+              }}
+            >
+              Log out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

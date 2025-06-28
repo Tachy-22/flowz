@@ -38,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface ToolsSidebarProps {
   onClose: () => void;
@@ -64,20 +65,27 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
   const [publicTemplates, setPublicTemplates] = useState<DiagramMeta[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [recentLimit, setRecentLimit] = useState(10);
+  const diagramId = useDiagramStore((state) => state.diagramId); // <-- get current loaded diagramId
+
+  const filteredRecentDiagrams = recentDiagrams.filter((diagram) =>
+    diagram.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // Load recent diagrams
-  const loadRecentDiagrams = async () => {
+  const loadRecentDiagrams = async (limitOverride?: number) => {
     if (!user) return;
 
     setIsLoadingRecent(true);
     try {
-      console.log("🔍 Loading recent diagrams for user:", user.uid);
+      //console.log("🔍 Loading recent diagrams for user:", user.uid);
       const diagrams = await diagramService.getUserDiagrams(user.uid, {
         orderBy: "updatedAt",
         orderDirection: "desc",
-        limit: 10,
+        limit: limitOverride || recentLimit,
       });
-      console.log("📊 Found diagrams:", diagrams);
+      //console.log("📊 Found diagrams:", diagrams);
       setRecentDiagrams(diagrams);
     } catch (error) {
       console.error("❌ Failed to load recent diagrams:", error);
@@ -87,15 +95,26 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
   };
 
   // Create new diagram
-  const createNewDiagram = () => {
+  const createNewDiagram = async () => {
     resetDiagram();
-    setDiagramId("");
-
-    console.log("📝 Created new diagram");
+    // Create a new diagram in Firestore and set the new id
+    if (user) {
+      const newDiagramId = await diagramService.createDiagram(user.uid, {
+        title: "Untitled Diagram",
+        nodes: [],
+        edges: [],
+        // allowedUsers: [user.uid],
+      });
+      setDiagramId(newDiagramId);
+    } else {
+      setDiagramId("");
+    }
+    //console.log("📝 Created new diagram");
   }; // Load a specific diagram
+
   const loadDiagram = async (diagramMeta: DiagramMeta) => {
     try {
-      console.log("📂 Loading diagram:", diagramMeta.title, diagramMeta.id);
+      //console.log("📂 Loading diagram:", diagramMeta.title, diagramMeta.id);
 
       // Clear existing state first to ensure clean load
       setNodes([]);
@@ -115,9 +134,9 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
         setNodes(diagram.nodes || []);
         setEdges(diagram.edges || []);
 
-        console.log("✅ Loaded diagram successfully:", diagram.title);
-        console.log("📊 Nodes:", diagram.nodes?.length || 0);
-        console.log("🔗 Edges:", diagram.edges?.length || 0);
+        //console.log("✅ Loaded diagram successfully:", diagram.title);
+        //console.log("📊 Nodes:", diagram.nodes?.length || 0);
+        //console.log("🔗 Edges:", diagram.edges?.length || 0);
       } else {
         console.error("❌ Diagram not found:", diagramMeta.id);
       }
@@ -126,7 +145,7 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
     }
   };
   const handleToolClick = (toolLabel: string) => {
-    console.log("🔧 Tool clicked:", toolLabel);
+    //console.log("🔧 Tool clicked:", toolLabel);
     switch (toolLabel) {
       case "Select":
         setActiveTool("select");
@@ -244,6 +263,18 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
     }
   };
 
+  const [diagramToDelete, setDiagramToDelete] = useState<DiagramMeta | null>(
+    null
+  );
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Update delete handler to use modal
+  const handleDeleteClick = (diagram: DiagramMeta, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDiagramToDelete(diagram);
+    setShowDeleteDialog(true);
+  };
+
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
@@ -278,25 +309,64 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
                   }}
                 >
                   <FolderOpen className="mr-2 h-4 w-4" />
-                  Open Recent
+                  Diagram History
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-56">
+                  <div className="px-2 py-1">
+                    <Input
+                      placeholder="Search diagrams..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="mb-2 h-7 text-xs"
+                    />
+                  </div>
                   {isLoadingRecent ? (
                     <div className="px-2 py-1 text-xs text-gray-500">
                       Loading recent diagrams...
                     </div>
-                  ) : recentDiagrams.length > 0 ? (
-                    recentDiagrams.map((diagram) => (
-                      <DropdownMenuItem
-                        key={diagram.id}
-                        onClick={() => loadDiagram(diagram)}
-                        className="cursor-pointer"
+                  ) : filteredRecentDiagrams.length > 0 ? (
+                    <>
+                      <div className="flex flex-col  max-h-[30rem] h-full overflow-y-auto">
+                        {filteredRecentDiagrams.map((diagram) => (
+                          <div
+                            key={diagram.id}
+                            className="flex items-center group"
+                          >
+                            <DropdownMenuItem
+                              onClick={() => loadDiagram(diagram)}
+                              className="cursor-pointer flex-1 truncate"
+                            >
+                              <span className="truncate">
+                                {diagram.title || "Untitled"}
+                              </span>
+                            </DropdownMenuItem>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="ml-1 p-1 h-6 w-6 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Delete diagram"
+                              onClick={(e) => handleDeleteClick(diagram, e)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const newLimit = recentLimit + 10;
+                          setRecentLimit(newLimit);
+                          await loadRecentDiagrams(newLimit);
+                        }}
                       >
-                        <span className="truncate">
-                          {diagram.title || "Untitled"}
-                        </span>
-                      </DropdownMenuItem>
-                    ))
+                        Load More
+                      </Button>
+                    </>
                   ) : (
                     <div className="px-2 py-1 text-xs text-gray-500">
                       No recent diagrams found
@@ -364,7 +434,10 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
                     <div
                       key={template.id}
                       className="flex flex-col items-center p-2 border rounded-lg cursor-pointer hover:shadow-md hover:bg-gray-50 transition group"
-                      onClick={() => loadDiagram(template)}
+                      onClick={() => {
+                        setShowTemplatesDialog(false);
+                        loadDiagram(template);
+                      }}
                     >
                       <div className="w-full aspect-video bg-gray-100 rounded mb-2 overflow-hidden flex items-center justify-center">
                         {template.description ? (
@@ -385,6 +458,52 @@ const ToolsSidebar: React.FC<ToolsSidebarProps> = ({ onClose }) => {
                   ))}
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent className="max-w-sm w-full">
+            <DialogHeader>
+              <DialogTitle>Delete Diagram</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <p>
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">
+                  {diagramToDelete?.title || "Untitled"}
+                </span>
+                ? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!diagramToDelete) return;
+                  setShowDeleteDialog(false);
+                  try {
+                    await diagramService.deleteDiagram(diagramToDelete.id);
+                    if (diagramToDelete.id === diagramId) {
+                      await createNewDiagram();
+                    }
+                    await loadRecentDiagrams();
+                  } catch (error) {
+                    console.error("❌ Failed to delete diagram:", error);
+                  } finally {
+                    setDiagramToDelete(null);
+                  }
+                }}
+              >
+                Delete
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

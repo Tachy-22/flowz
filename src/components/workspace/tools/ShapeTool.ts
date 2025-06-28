@@ -63,10 +63,10 @@ export class ShapeTool {
     this.startScreenPosition = screenPosition;
     this.currentScreenPosition = screenPosition;
 
-    console.log(
-      `🎨 Started drawing ${this.options.shapeType} at:`,
-      this.startPosition
-    );
+    // console.log(
+    //   `🎨 Started drawing ${this.options.shapeType} at:`,
+    //   this.startPosition
+    // );
   }
 
   // Update drawing (for preview)
@@ -91,7 +91,7 @@ export class ShapeTool {
       bounds.width < this.options.minWidth ||
       bounds.height < this.options.minHeight
     ) {
-      console.log(`❌ ${this.options.shapeType} too small, using default size`);
+     // console.log(`❌ ${this.options.shapeType} too small, using default size`);
 
       // Create default-sized shape at click position
       const node = this.createNodeFromBounds({
@@ -112,7 +112,7 @@ export class ShapeTool {
 
   // Cancel drawing
   cancelDrawing(): void {
-    console.log(`🚫 Cancelled ${this.options.shapeType} drawing`);
+    //console.log(`🚫 Cancelled ${this.options.shapeType} drawing`);
     this.reset();
   }
 
@@ -229,7 +229,7 @@ export class ShapeTool {
       node.height = bounds.height;
     }
 
-    console.log(`✅ Created ${this.options.shapeType} node:`, node);
+   // //console.log(`✅ Created ${this.options.shapeType} node:`, node);
     return node;
   }
 

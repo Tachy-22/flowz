@@ -42,18 +42,17 @@ const GeminiChat: React.FC = () => {
     edges,
     diagramTitle,
     diagramId,
-
     setDiagramId,
-
     setLoading: setDiagramLoading,
     loadDiagram,
+    setPendingDiagramToAnimate, // <-- add this
   } = useDiagramStore();
   const { user } = useUserStore();
   // Initialize chat on component mount
   useEffect(() => {
     const initializeChat = async () => {
       try {
-        console.log("🔧 Initializing Gemini chat component");
+        //console.log("🔧 Initializing Gemini chat component");
 
         const defaultHistory: ChatHistory[] = [
           {
@@ -66,14 +65,14 @@ const GeminiChat: React.FC = () => {
           },
         ];
 
-        console.log("📝 Creating chat with default history");
-        const chatInstance = createChat(defaultHistory);
-        console.log("✅ Chat instance created:", !!chatInstance);
-        console.log("Chat instance type:", typeof chatInstance);
-        console.log("Chat instance keys:", Object.keys(chatInstance || {}));
+        //  console.log("📝 Creating chat with default history");
+        createChat(defaultHistory);
+        // console.error("✅ Chat instance created:", !!chatInstance);
+        // console.log("Chat instance type:", typeof chatInstance);
+        // console.log("Chat instance keys:", Object.keys(chatInstance || {}));
 
         //  setChat(chatInstance);
-        console.log("🎯 Chat state updated");
+        // console.log("🎯 Chat state updated");
       } catch (error) {
         console.error("❌ Failed to initialize chat:");
         console.error("Error type:", typeof error);
@@ -99,13 +98,13 @@ const GeminiChat: React.FC = () => {
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    console.log("🚀 Starting AI diagram creation process");
-    console.log("Input:", input.trim());
-    console.log("Current diagram context:", {
-      nodes: nodes.length,
-      edges: edges.length,
-      title: diagramTitle,
-    });
+    // console.log("🚀 Starting AI diagram creation process");
+    // console.log("Input:", input.trim());
+    // console.log("Current diagram context:", {
+    //   nodes: nodes.length,
+    //   edges: edges.length,
+    //   title: diagramTitle,
+    // });
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -139,7 +138,7 @@ const GeminiChat: React.FC = () => {
               }
             : undefined,
       };
-      console.log("📤 Sending request to diagram agent");
+      // console.log("📤 Sending request to diagram agent");
 
       // Use streaming version for real-time updates
       let finalDiagramData: {
@@ -162,21 +161,16 @@ const GeminiChat: React.FC = () => {
               : msg
           )
         );
-
-        // Store diagram data when complete
+        // Remove unused variable
+        // fullChatResponse = chunk.chatResponse;
+        // Only store the final diagram data for animation
         if (chunk.isComplete && chunk.diagramData) {
           finalDiagramData = chunk.diagramData;
         }
       }
-
-      console.log("📥 Streaming completed:", {
-        hasDiagramData: !!finalDiagramData,
-        finalDiagramData,
-      });
-
-      // If diagram data was generated, create/update the diagram
+      // --- Simulated streaming animation now handled in DiagramCanvas ---
       if (finalDiagramData && user) {
-        console.log("🎨 Creating/updating diagram with AI-generated data");
+        setPendingDiagramToAnimate(finalDiagramData);
         await createDiagramFromAI(finalDiagramData);
       }
     } catch (error) {
@@ -197,7 +191,7 @@ const GeminiChat: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
-      console.log("🏁 AI diagram creation process completed");
+      //console.log("🏁 AI diagram creation process completed");
       // Focus back to input
       setTimeout(() => inputRef.current?.focus(), 100);
     }
@@ -214,10 +208,10 @@ const GeminiChat: React.FC = () => {
     try {
       setDiagramLoading(true);
 
-      console.log(
-        "🎨 Loading AI-generated diagram with coordinates:",
-        diagramData.nodes.map((n) => ({ id: n.id, position: n.position }))
-      );
+      //console.log(
+      //   "🎨 Loading AI-generated diagram with coordinates:",
+      //   diagramData.nodes.map((n) => ({ id: n.id, position: n.position }))
+      // );
 
       // Update the diagram state with AI-generated data using loadDiagram
       loadDiagram(
@@ -229,9 +223,9 @@ const GeminiChat: React.FC = () => {
 
       // Save to Firebase
       if (diagramId && diagramData.action === "modify_diagram") {
-        console.log({ action: diagramData.action });
+        //console.log({ action: diagramData.action });
         // Update existing diagram
-        console.log("💾 Updating existing diagram with AI data");
+        //console.log("💾 Updating existing diagram with AI data");
         await diagramService.updateDiagramContent(
           diagramId,
           diagramData.nodes,
@@ -243,7 +237,7 @@ const GeminiChat: React.FC = () => {
         });
       } else {
         // Create new diagram
-        console.log("🆕 Creating new diagram with AI data");
+        //console.log("🆕 Creating new diagram with AI data");
         const newDiagramId = await diagramService.createDiagram(user.uid, {
           title: diagramData.title,
           description: diagramData.description,
@@ -253,7 +247,7 @@ const GeminiChat: React.FC = () => {
         setDiagramId(newDiagramId);
       }
 
-      console.log("✅ Diagram successfully created/updated with AI data");
+      //console.log("✅ Diagram successfully created/updated with AI data");
     } catch (error) {
       console.error("❌ Failed to save AI-generated diagram:", error);
     } finally {
@@ -279,25 +273,25 @@ const GeminiChat: React.FC = () => {
       },
     ]);
     // Reinitialize chat
-    const defaultHistory: ChatHistory[] = [
-      {
-        role: "model",
-        parts: [
-          {
-            text: "Hello! I'm your AI assistant for creating flow diagrams. How can I help you today?",
-          },
-        ],
-      },
-    ];
-    const chatInstance = createChat(defaultHistory);
-    console.log(chatInstance);
+    // const defaultHistory: ChatHistory[] = [
+    //   {
+    //     role: "model",
+    //     parts: [
+    //       {
+    //         text: "Hello! I'm your AI assistant for creating flow diagrams. How can I help you today?",
+    //       },
+    //     ],
+    //   },
+    // ];
+    // const chatInstance = createChat(defaultHistory);
+    // console.log(chatInstance);
   };
 
   return (
     <div className="h-full flex flex-col">
       {/* Chat Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
-        <span className="text-sm font-medium text-gray-700">Chat History</span>
+      <div className="flex items-center justify-end p-3 border-b border-gray-200 bg-gray-50">
+        {/* <span className="text-sm font-medium text-gray-700">Chat History</span> */}
         <Button
           variant="ghost"
           size="sm"
@@ -316,10 +310,10 @@ const GeminiChat: React.FC = () => {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-start space-x-3 ${
+                className={`flex gap-3 items-start  ${
                   message.role === "user"
-                    ? "flex-row-reverse space-x-reverse"
-                    : ""
+                    ? "flex-row-reverse  w-full "
+                    : "justify-end"
                 }`}
               >
                 <div
@@ -337,15 +331,15 @@ const GeminiChat: React.FC = () => {
                 </div>
 
                 <div
-                  className={`flex-1 ${
-                    message.role === "user" ? "text-right" : ""
+                  className={` ${
+                    message.role === "user" ? "flex flex-col items-end " : ""
                   }`}
                 >
                   {" "}
                   <div
-                    className={`inline-block p-3 rounded-lg max-w-[80%] relative ${
+                    className={`inline-block p-3 rounded-lg max-w-[80%] w-fit border relative ${
                       message.role === "user"
-                        ? "bg-indigo-600 text-white"
+                        ? "bg-indigo-600 text-white items-end justify-end"
                         : "bg-gray-100 text-gray-900"
                     }`}
                   >

@@ -1,5 +1,19 @@
 import { create } from "zustand";
 import { Node, Edge } from "@/types/diagram";
+import { diagramService } from "@/integrations/firebase/diagrams";
+import { useUserStore } from "@/integrations/zustand/useUserStore";
+
+// Debounce utility
+function debounce<T extends (...args: unknown[]) => void>(
+  fn: T,
+  delay: number
+) {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 
 export type Tool =
   | "select"
@@ -7,7 +21,6 @@ export type Tool =
   | "triangle"
   | "circle"
   | "draw"
-
   | "diamond"
   | "arrow"
   | "text"
@@ -54,6 +67,22 @@ interface DiagramState {
   diagramId: string | null;
   diagramTitle: string;
   loading: boolean;
+
+  // Animation handoff for AI/streamed diagrams
+  pendingDiagramToAnimate?: {
+    nodes: Node[];
+    edges: Edge[];
+    title: string;
+    description?: string;
+  } | null;
+  setPendingDiagramToAnimate: (
+    diagram: {
+      nodes: Node[];
+      edges: Edge[];
+      title: string;
+      description?: string;
+    } | null
+  ) => void;
 
   // Actions
   setNodes: (nodes: Node[]) => void;
@@ -110,242 +139,272 @@ const initialViewport: Viewport = {
   zoom: 1,
 };
 
-export const useDiagramStore = create<DiagramState>((set, get) => ({
-  // Initial state
-  nodes: [],
-  edges: [],
-  selectedNodeId: null,
-  selectedEdgeId: null,
-  viewport: initialViewport,
-  activeTool: "select",
-  shouldAddRectangle: false,
-  shouldAddText: false,
-  shouldAddDraw: false,
-  history: [],
-  currentHistoryIndex: -1,
-  isConnecting: false,
-  connectionStartNode: null,
-  connectionSourceHandle: null,
-  connectionPreview: null,
-  diagramId: null,
-  diagramTitle: "Untitled Diagram",
-  loading: false,
-
-  // Basic setters
-  setNodes: (nodes) => {
-    set({ nodes });
-    get().saveToHistory();
-  },
-
-  setEdges: (edges) => {
-    set({ edges });
-    get().saveToHistory();
-  },
-
-  addNode: (node) => {
-    set((state) => ({
-      nodes: [...state.nodes, node],
-    }));
-    get().saveToHistory();
-  },
-
-  updateNode: (id, updates) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === id ? { ...node, ...updates } : node
-      ),
-    }));
-    get().saveToHistory();
-  },
-
-  deleteNode: (id) => {
-    set((state) => ({
-      nodes: state.nodes.filter((node) => node.id !== id),
-      edges: state.edges.filter(
-        (edge) => edge.source !== id && edge.target !== id
-      ),
-      selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
-    }));
-    get().saveToHistory();
-  },
-
-  addEdge: (edge) => {
-    set((state) => ({
-      edges: [...state.edges, edge],
-    }));
-    get().saveToHistory();
-  },
-
-  deleteEdge: (id) => {
-    set((state) => ({
-      edges: state.edges.filter((edge) => edge.id !== id),
-    }));
-    get().saveToHistory();
-  },
-  setSelectedNodeId: (id) => set({ selectedNodeId: id }),
-  setSelectedEdgeId: (id) => set({ selectedEdgeId: id }),
-  setViewport: (viewport) => set({ viewport }),
-
-  // Tool actions
-  setActiveTool: (tool) => set({ activeTool: tool }),
-  triggerAddRectangle: () => set({ shouldAddRectangle: true }),
-  resetAddRectangleFlag: () => set({ shouldAddRectangle: false }),
-  triggerAddText: () => set({ shouldAddText: true }),
-  resetAddTextFlag: () => set({ shouldAddText: false }),
-  triggerAddDraw: () => set({ shouldAddDraw: true }),
-  resetAddDrawFlag: () => set({ shouldAddDraw: false }),
-  // Connection actions
-  startConnection: (nodeId, handle) =>
-    set({
-      isConnecting: true,
-      connectionStartNode: nodeId,
-      connectionSourceHandle: handle || "right",
-      connectionPreview: null,
-    }),
-
-  updateConnectionPreview: (position) =>
-    set((state) => ({
-      connectionPreview: state.isConnecting ? position : null,
-    })),
-
-  endConnection: () =>
-    set({
-      isConnecting: false,
-      connectionStartNode: null,
-      connectionSourceHandle: null,
-      connectionPreview: null,
-    }),
-
-  finishConnection: (targetNodeId, targetHandle) => {
-    const state = get();
-    if (
-      !state.isConnecting ||
-      !state.connectionStartNode ||
-      state.connectionStartNode === targetNodeId
-    ) {
-      console.warn("🔗 Cannot finish connection - invalid state");
-      get().endConnection();
-      return;
+export const useDiagramStore = create<DiagramState>((set, get) => {
+  // Debounced autosave function
+  const debouncedAutoSave = debounce(async () => {
+    const { diagramId, nodes, edges, loading } = get();
+    const user = useUserStore.getState().user;
+    if (!user || loading) return;
+    set({ loading: true });
+    try {
+      if (diagramId) {
+        await diagramService.updateDiagramContent(diagramId, nodes, edges);
+      }
+    } catch (e) {
+      // Optionally handle error
+      console.error("Auto-save error:", e);
+    } finally {
+      set({ loading: false });
     }
+  }, 1000);
 
-    const newEdge: Edge = {
-      id: `edge-${state.connectionStartNode}-${targetNodeId}-${Date.now()}`,
-      source: state.connectionStartNode,
-      target: targetNodeId,
-      sourceHandle: state.connectionSourceHandle || undefined,
-      targetHandle: targetHandle || "left",
-      type: "smoothstep",
-      data: {},
-    };
+  return {
+    // Initial state
+    nodes: [],
+    edges: [],
+    selectedNodeId: null,
+    selectedEdgeId: null,
+    viewport: initialViewport,
+    activeTool: "select",
+    shouldAddRectangle: false,
+    shouldAddText: false,
+    shouldAddDraw: false,
+    history: [],
+    currentHistoryIndex: -1,
+    isConnecting: false,
+    connectionStartNode: null,
+    connectionSourceHandle: null,
+    connectionPreview: null,
+    diagramId: null,
+    diagramTitle: "Untitled Diagram",
+    loading: false,
+    pendingDiagramToAnimate: null,
 
-    set((state) => ({
-      edges: [...state.edges, newEdge],
-      isConnecting: false,
-      connectionStartNode: null,
-      connectionSourceHandle: null,
-      connectionPreview: null,
-    }));
+    // Basic setters
+    setNodes: (nodes) => {
+      set({ nodes });
+      get().saveToHistory();
+      debouncedAutoSave();
+    },
 
-    get().saveToHistory();
-    console.log("🔗 Created connection:", newEdge);
-  },
+    setEdges: (edges) => {
+      set({ edges });
+      get().saveToHistory();
+      debouncedAutoSave();
+    },
 
-  // History management
-  saveToHistory: () => {
-    const state = get();
-    const historyState: HistoryState = {
-      nodes: [...state.nodes],
-      edges: [...state.edges],
-      timestamp: Date.now(),
-    };
+    addNode: (node) => {
+      set((state) => ({
+        nodes: [...state.nodes, node],
+      }));
+      get().saveToHistory();
+      debouncedAutoSave();
+    },
 
-    // Remove any future history if we're not at the end
-    const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-    newHistory.push(historyState);
+    updateNode: (id, updates) => {
+      set((state) => ({
+        nodes: state.nodes.map((node) =>
+          node.id === id ? { ...node, ...updates } : node
+        ),
+      }));
+      get().saveToHistory();
+    },
 
-    // Limit history size to 50 entries
-    if (newHistory.length > 50) {
-      newHistory.shift();
-    }
+    deleteNode: (id) => {
+      set((state) => ({
+        nodes: state.nodes.filter((node) => node.id !== id),
+        edges: state.edges.filter(
+          (edge) => edge.source !== id && edge.target !== id
+        ),
+        selectedNodeId:
+          state.selectedNodeId === id ? null : state.selectedNodeId,
+      }));
+      get().saveToHistory();
+    },
 
-    set({
-      history: newHistory,
-      currentHistoryIndex: newHistory.length - 1,
-    });
-  },
+    addEdge: (edge) => {
+      set((state) => ({
+        edges: [...state.edges, edge],
+      }));
+      get().saveToHistory();
+      debouncedAutoSave();
+    },
 
-  undo: () => {
-    const state = get();
-    if (state.currentHistoryIndex > 0) {
-      const previousState = state.history[state.currentHistoryIndex - 1];
+    deleteEdge: (id) => {
+      set((state) => ({
+        edges: state.edges.filter((edge) => edge.id !== id),
+      }));
+      get().saveToHistory();
+    },
+    setSelectedNodeId: (id) => set({ selectedNodeId: id }),
+    setSelectedEdgeId: (id) => set({ selectedEdgeId: id }),
+    setViewport: (viewport) => set({ viewport }),
+
+    // Tool actions
+    setActiveTool: (tool) => set({ activeTool: tool }),
+    triggerAddRectangle: () => set({ shouldAddRectangle: true }),
+    resetAddRectangleFlag: () => set({ shouldAddRectangle: false }),
+    triggerAddText: () => set({ shouldAddText: true }),
+    resetAddTextFlag: () => set({ shouldAddText: false }),
+    triggerAddDraw: () => set({ shouldAddDraw: true }),
+    resetAddDrawFlag: () => set({ shouldAddDraw: false }),
+    // Connection actions
+    startConnection: (nodeId, handle) =>
       set({
-        nodes: [...previousState.nodes],
-        edges: [...previousState.edges],
-        currentHistoryIndex: state.currentHistoryIndex - 1,
-      });
-    }
-  },
+        isConnecting: true,
+        connectionStartNode: nodeId,
+        connectionSourceHandle: handle || "right",
+        connectionPreview: null,
+      }),
 
-  redo: () => {
-    const state = get();
-    if (state.currentHistoryIndex < state.history.length - 1) {
-      const nextState = state.history[state.currentHistoryIndex + 1];
+    updateConnectionPreview: (position) =>
+      set((state) => ({
+        connectionPreview: state.isConnecting ? position : null,
+      })),
+
+    endConnection: () =>
       set({
-        nodes: [...nextState.nodes],
-        edges: [...nextState.edges],
-        currentHistoryIndex: state.currentHistoryIndex + 1,
+        isConnecting: false,
+        connectionStartNode: null,
+        connectionSourceHandle: null,
+        connectionPreview: null,
+      }),
+
+    finishConnection: (targetNodeId, targetHandle) => {
+      const state = get();
+      if (
+        !state.isConnecting ||
+        !state.connectionStartNode ||
+        state.connectionStartNode === targetNodeId
+      ) {
+        console.warn("🔗 Cannot finish connection - invalid state");
+        get().endConnection();
+        return;
+      }
+
+      const newEdge: Edge = {
+        id: `edge-${state.connectionStartNode}-${targetNodeId}-${Date.now()}`,
+        source: state.connectionStartNode,
+        target: targetNodeId,
+        sourceHandle: state.connectionSourceHandle || undefined,
+        targetHandle: targetHandle || "left",
+        type: "smoothstep",
+        data: {},
+      };
+
+      set((state) => ({
+        edges: [...state.edges, newEdge],
+        isConnecting: false,
+        connectionStartNode: null,
+        connectionSourceHandle: null,
+        connectionPreview: null,
+      }));
+
+      get().saveToHistory();
+      console.log("🔗 Created connection:", newEdge);
+    },
+
+    // History management
+    saveToHistory: () => {
+      const state = get();
+      const historyState: HistoryState = {
+        nodes: [...state.nodes],
+        edges: [...state.edges],
+        timestamp: Date.now(),
+      };
+
+      // Remove any future history if we're not at the end
+      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
+      newHistory.push(historyState);
+
+      // Limit history size to 50 entries
+      if (newHistory.length > 50) {
+        newHistory.shift();
+      }
+
+      set({
+        history: newHistory,
+        currentHistoryIndex: newHistory.length - 1,
       });
-    }
-  },
+    },
 
-  canUndo: () => {
-    const state = get();
-    return state.currentHistoryIndex > 0;
-  },
+    undo: () => {
+      const state = get();
+      if (state.currentHistoryIndex > 0) {
+        const previousState = state.history[state.currentHistoryIndex - 1];
+        set({
+          nodes: [...previousState.nodes],
+          edges: [...previousState.edges],
+          currentHistoryIndex: state.currentHistoryIndex - 1,
+        });
+      }
+    },
 
-  canRedo: () => {
-    const state = get();
-    return state.currentHistoryIndex < state.history.length - 1;
-  },
+    redo: () => {
+      const state = get();
+      if (state.currentHistoryIndex < state.history.length - 1) {
+        const nextState = state.history[state.currentHistoryIndex + 1];
+        set({
+          nodes: [...nextState.nodes],
+          edges: [...nextState.edges],
+          currentHistoryIndex: state.currentHistoryIndex + 1,
+        });
+      }
+    },
 
-  // Diagram management
-  setDiagramId: (id) => set({ diagramId: id }),
-  setDiagramTitle: (title) => set({ diagramTitle: title }),
-  setLoading: (loading) => set({ loading }),
+    canUndo: () => {
+      const state = get();
+      return state.currentHistoryIndex > 0;
+    },
 
-  resetDiagram: () =>
-    set({
-      nodes: [],
-      edges: [],
-      selectedNodeId: null,
-      viewport: initialViewport,
-      history: [],
-      currentHistoryIndex: -1,
-      isConnecting: false,
-      connectionStartNode: null,
-      diagramTitle: "Untitled Diagram",
-    }),
+    canRedo: () => {
+      const state = get();
+      return state.currentHistoryIndex < state.history.length - 1;
+    },
 
-  loadDiagram: (nodes, edges, title = "Untitled Diagram", id = undefined) => {
-    set({
-      nodes,
-      edges,
-      diagramTitle: title,
-      diagramId: id,
-      selectedNodeId: null,
-      viewport: initialViewport,
-      history: [],
-      currentHistoryIndex: -1,
-      isConnecting: false,
-      connectionStartNode: null,
-    });
-  },
+    // Diagram management
+    setDiagramId: (id) => set({ diagramId: id }),
+    setDiagramTitle: (title) => set({ diagramTitle: title }),
+    setLoading: (loading) => set({ loading }),
 
-  getDiagramData: () => {
-    const state = get();
-    return {
-      nodes: state.nodes,
-      edges: state.edges,
-    };
-  },
-}));
+    resetDiagram: () =>
+      set({
+        nodes: [],
+        edges: [],
+        selectedNodeId: null,
+        viewport: initialViewport,
+        history: [],
+        currentHistoryIndex: -1,
+        isConnecting: false,
+        connectionStartNode: null,
+        diagramTitle: "Untitled Diagram",
+      }),
+
+    loadDiagram: (nodes, edges, title = "Untitled Diagram", id = undefined) => {
+      set({
+        nodes,
+        edges,
+        diagramTitle: title,
+        diagramId: id,
+        selectedNodeId: null,
+        viewport: initialViewport,
+        history: [],
+        currentHistoryIndex: -1,
+        isConnecting: false,
+        connectionStartNode: null,
+      });
+    },
+
+    getDiagramData: () => {
+      const state = get();
+      return {
+        nodes: state.nodes,
+        edges: state.edges,
+      };
+    },
+
+    // Animation handoff setter
+    setPendingDiagramToAnimate: (diagram) =>
+      set({ pendingDiagramToAnimate: diagram }),
+  };
+});

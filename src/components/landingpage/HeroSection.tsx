@@ -1,61 +1,30 @@
 "use client";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 const HeroSection = () => {
-  const [email, setEmail] = useState("");
-
   return (
-    <section className="text-center py-20 px-6 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-6xl font-bold text-gray-900 mb-6 leading-tight">
-          Automation Without Limits,
+    <section className="relative text-center py-28 px-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden">
+      <div className="max-w-4xl mx-auto relative z-10">
+        <h1 className="text-6xl md:text-7xl font-extrabold text-gray-900 mb-8 leading-tight drop-shadow-sm">
+          Build, Collaborate, and Automate
           <br />
-          Power ⚡ Without Effort
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-blue-500 to-purple-500 animate-gradient">
+            Flow Diagrams
+          </span>{" "}
+          with AI
         </h1>
-        <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-          Effortlessly connect your tools, streamline tasks, and unlock a new
-          era of productivity powered by seamless automation.
+        <p className="text-2xl text-gray-600 mb-12 max-w-2xl mx-auto font-medium">
+          The next-generation diagram builder. Draw, edit, and generate
+          flowcharts collaboratively in real time. Save, share, and manage
+          diagrams with ease—no coding required.
         </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 max-w-md mx-auto">
-          <Input
-            type="email"
-            placeholder="Your Business Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg whitespace-nowrap">
-            Subscribe
-          </Button>
+        <div className="inline-block px-6 py-2 rounded-full bg-emerald-50 text-emerald-600 font-semibold text-base shadow-sm mb-8 animate-fade-in">
+          Try AI-powered diagramming for free
         </div>
-
-        <div className="relative">
-          <span className="text-emerald-500 font-medium">
-            Get 3 months trial now!
-          </span>
-          <svg
-            className="absolute -right-8 top-2 w-16 h-8 text-emerald-500"
-            viewBox="0 0 64 32"
-            fill="currentColor"
-          >
-            <path d="M2 16c0-7.732 6.268-14 14-14s14 6.268 14 14-6.268 14-14 14S2 23.732 2 16zm30 0l16-8v16l-16-8z" />
-          </svg>
-        </div>
-
-        <p className="text-gray-500 mt-6">Trusted by Company</p>
-
-        <div className="flex items-center justify-center space-x-8 mt-8 opacity-60">
-          <span className="text-gray-400 font-medium">Polymath</span>
-          <span className="text-gray-400 font-medium">Acme Corp</span>
-          <span className="text-gray-400 font-medium">Nietzsche</span>
-          <span className="text-gray-400 font-medium">Epicurious</span>
-          <span className="text-gray-400 font-medium">CloudWatch</span>
-          <span className="text-gray-400 font-medium">Acme Corp</span>
-        </div>
+       
       </div>
+      {/* Decorative blurred gradients */}
+      <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-200 opacity-30 rounded-full blur-3xl z-0" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-purple-200 opacity-20 rounded-full blur-3xl z-0" />
     </section>
   );
 };

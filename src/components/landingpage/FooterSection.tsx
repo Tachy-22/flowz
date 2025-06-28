@@ -9,14 +9,15 @@ const FooterSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="text-4xl font-bold mb-6">
-              Sign up for our newsletter and stay updated with the latest news.
+              Stay in the Flowz loop—get product updates and AI diagramming
+              tips.
             </h2>
           </div>
 
           <div>
             <div className="mb-8">
               <span className="text-gray-400 text-sm font-medium uppercase tracking-wide">
-                RECEIVE UPDATES FROM US.
+                JOIN OUR NEWSLETTER
               </span>
               <div className="flex mt-4">
                 <Input
@@ -25,7 +26,7 @@ const FooterSection = () => {
                   className="flex-1 bg-transparent border-b border-gray-600 rounded-none px-0 py-3 text-white placeholder-gray-400 focus:border-white focus:ring-0"
                 />
                 <Button className="bg-white text-gray-900 hover:bg-gray-100 px-8 py-3 rounded-lg ml-4">
-                  Submit
+                  Subscribe
                 </Button>
               </div>
             </div>
@@ -34,31 +35,26 @@ const FooterSection = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16 pt-16 border-t border-gray-800">
           <div>
-            <h3 className="font-semibold mb-4">Company</h3>
+            <h3 className="font-semibold mb-4">Product</h3>
             <ul className="space-y-2 text-gray-400">
               <li>
                 <a href="#" className="hover:text-white">
-                  Who We Are
+                  Features
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Join Our Team
+                  AI Assistant
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  News & Updates
+                  Templates
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Meet Our Leaders
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white">
-                  Get in Touch
+                  Export & Import
                 </a>
               </li>
             </ul>
@@ -69,79 +65,74 @@ const FooterSection = () => {
             <ul className="space-y-2 text-gray-400">
               <li>
                 <a href="#" className="hover:text-white">
-                  Expert Articles
+                  Docs
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Webinars & Events
+                  Blog
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Success Stories
+                  Changelog
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Help Center
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-semibold mb-4">Solutions</h3>
-            <ul className="space-y-2 text-gray-400">
-              <li>
-                <a href="#" className="hover:text-white">
-                  Smart Hiring
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white">
-                  Engaged Teams
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white">
-                  Insightful Analytics
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white">
-                  Effortless Automation
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white">
-                  Scalable Growth
+                  Support
                 </a>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4">Support</h3>
+            <h3 className="font-semibold mb-4">Company</h3>
             <ul className="space-y-2 text-gray-400">
               <li>
                 <a href="#" className="hover:text-white">
-                  System Status Updates
+                  About
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Community Forum
+                  Careers
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Email Support
+                  Contact
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white">
-                  Onboarding & Training
+                  Privacy Policy
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-4">Connect</h3>
+            <ul className="space-y-2 text-gray-400">
+              <li>
+                <a href="#" className="hover:text-white">
+                  Community
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-white">
+                  Twitter
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-white">
+                  LinkedIn
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-white">
+                  GitHub
                 </a>
               </li>
             </ul>
@@ -155,7 +146,7 @@ const FooterSection = () => {
             <Facebook className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer" />
           </div>
           <p className="text-gray-400 text-sm">
-            © 2025 AutoMesh . All Right Reserved
+            © 2025 Flowz. All Rights Reserved.
           </p>
         </div>
       </div>

@@ -1,19 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Debug logging for environment setup
-console.log("🔧 Gemini Setup Debug:");
-console.log(
-  "API Key exists:",
-  !!process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY
-);
-console.log(
-  "API Key length:",
-  process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY?.length || 0
-);
-console.log(
-  "API Key prefix:",
-  process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY?.substring(0, 10) + "..."
-);
+// console.log("🔧 Gemini Setup Debug:");
+// console.log(
+//   "API Key exists:",
+//   !!process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY
+// );
+// console.log(
+//   "API Key length:",
+//   process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY?.length || 0
+// );
+// console.log(
+//   "API Key prefix:",
+//   process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY?.substring(0, 10) + "..."
+// );
 
 // Initialize the GoogleGenAI instance
 const ai = new GoogleGenAI({
@@ -74,18 +74,18 @@ export const createChat = (
   history: ChatHistory[] = defaultHistory
 ): GeminiChat => {
   try {
-    console.log(
-      "🔄 Creating Gemini chat with history:",
-      history.length,
-      "messages"
-    );
+    // console.log(
+    //   "🔄 Creating Gemini chat with history:",
+    //   history.length,
+    //   "messages"
+    // );
 
     const chat = ai.chats.create({
       model: "gemini-2.5-flash",
       history: history,
     });
 
-    console.log("✅ Chat created successfully");
+    // console.log("✅ Chat created successfully");
     return chat as unknown as GeminiChat;
   } catch (error) {
     logError("Creating Gemini chat", error);
@@ -99,10 +99,10 @@ export const sendMessageStream = async function* (
   message: string
 ): AsyncGenerator<string, void, unknown> {
   try {
-    console.log(
-      "🌊 Starting streaming message to Gemini:",
-      message.substring(0, 50) + "..."
-    );
+    // console.log(
+    //   "🌊 Starting streaming message to Gemini:",
+    //   message.substring(0, 50) + "..."
+    // );
 
     const stream = await chat.sendMessageStream({
       message: message,
@@ -110,12 +110,12 @@ export const sendMessageStream = async function* (
 
     for await (const chunk of stream) {
       if (chunk.text) {
-        console.log("📥 Received chunk:", chunk.text);
+        // console.log("📥 Received chunk:", chunk.text);
         yield chunk.text; // Yield individual chunks for real-time streaming
       }
     }
 
-    console.log("✅ Streaming completed");
+    // console.log("✅ Streaming completed");
   } catch (error) {
     logError("Streaming message to Gemini", error);
 

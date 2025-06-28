@@ -3,41 +3,31 @@ import { Card, CardContent } from "@/components/ui/card";
 const TestimonialsSection = () => {
   const testimonials = [
     {
-      company: "asana",
-      title: "A True Game-Changer for Our Business!",
+      company: "Acme Software",
+      title: "AI diagramming is a game-changer!",
       quote:
-        "Tasks that used to take hours are now completed in minutes. Highly recommend for any business looking to optimize efficiency! The intuitive interface, automation features, and seamless integration make workflow management effortless and significantly boost productivity.",
-      author: "Eleanor Pena",
-      role: "Scrum Master",
-      bgColor: "bg-purple-100",
+        "Flowz lets our team brainstorm and build process flows in minutes. The Gemini AI suggestions are spot-on, and real-time editing is seamless.",
+      author: "Jordan Lee",
+      role: "Product Manager",
+      bgColor: "bg-indigo-50",
     },
     {
-      title: "Seamless, Efficient, and Simply!",
+      company: "StartupX",
+      title: "Collaboration made easy",
       quote:
-        "The automation tools alone have saved us so much time. We couldn't be happier!",
-      author: "Marvin McKinney",
-      role: "Marketing Coordinator",
+        "We use Flowz to map out user journeys and technical diagrams. Sharing and editing together saves us hours every week.",
+      author: "Priya Patel",
+      role: "Lead Designer",
+      bgColor: "bg-blue-50",
     },
     {
-      title: "Boosted Our Productivity.",
+      company: "Freelance Consultant",
+      title: "From text to flowchart in seconds",
       quote:
-        "The ability to automate repetitive tasks has allowed us to focus on growth, strategy, and innovation.",
-      author: "Floyd Miles",
-      role: "Project Manager",
-    },
-    {
-      title: "Powerful Features and Simple!",
-      quote:
-        "Our entire team quickly adapted, and now we can't imagine working without it!",
-      author: "Ronald Richards",
-      role: "President of Sales",
-    },
-    {
-      title: "Reliable, Scalable, and Perfect.",
-      quote:
-        "It's reliable, efficient, and constantly evolving to meet modern business demands!",
-      author: "Bessie Cooper",
-      role: "Team Leader",
+        "I just describe my process and Flowz builds the diagram for me. Exporting to PNG and sharing with clients is effortless.",
+      author: "Alex Kim",
+      role: "Automation Specialist",
+      bgColor: "bg-emerald-50",
     },
   ];
 
@@ -49,13 +39,11 @@ const TestimonialsSection = () => {
             Testimonials
           </span>
           <h2 className="text-5xl font-bold text-gray-900 mt-4 mb-6">
-            Enterprise grade solutions built
-            <br />
-            for efficiency and scale.
+            Teams Love Flowz
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Optimized systems crafted to streamline, scale, and elevate business
-            performance.
+            See how Flowz is transforming the way people create, share, and
+            automate diagrams.
           </p>
         </div>
 
@@ -70,7 +58,7 @@ const TestimonialsSection = () => {
               <CardContent className="p-0">
                 {testimonial.company && (
                   <div className="flex items-center mb-4">
-                    <div className="w-6 h-6 bg-red-500 rounded-full mr-2"></div>
+                    <div className="w-6 h-6 bg-indigo-500 rounded-full mr-2"></div>
                     <span className="font-medium text-gray-900">
                       {testimonial.company}
                     </span>

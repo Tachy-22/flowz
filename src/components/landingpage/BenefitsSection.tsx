@@ -1,46 +1,48 @@
-import { Zap, RotateCcw, Sparkles, ChevronRight, FileText } from "lucide-react";
+import { Sparkles, Users, Brain, FileText, Share2, Zap } from "lucide-react";
 
 const BenefitsSection = () => {
   const benefits = [
     {
-      icon: <Zap className="w-6 h-6 text-white" />,
-      title: "Flow in motion",
+      icon: <Brain className="w-6 h-6 text-white" />,
+      title: "AI-Powered Diagramming",
       description:
-        "Automate tasks, streamline processes, and boost productivity.",
-      bgColor: "bg-emerald-500",
+        "Generate, edit, and expand diagrams instantly with AI. Let AI handle the structure—focus on your ideas.",
+      bgColor: "bg-indigo-600",
     },
     {
-      icon: <Zap className="w-6 h-6 text-white" />,
-      title: "Swift and seamless",
-      description: "Create powerful workflows effortlessly, reducing errors.",
+      icon: <Users className="w-6 h-6 text-white" />,
+      title: "Real-Time Collaboration",
+      description:
+        "Work together with your team live. See changes instantly and co-create diagrams from anywhere.",
       bgColor: "bg-blue-500",
     },
     {
       icon: <Sparkles className="w-6 h-6 text-white" />,
-      title: "Automate with ease",
-      description: "Streamline processes, save time, and enhance efficiency.",
-      bgColor: "bg-orange-500",
-    },
-    {
-      icon: <ChevronRight className="w-6 h-6 text-white" />,
-      title: "Quick Start",
+      title: "Template Library",
       description:
-        "Choose from a library of pre-built workflow templates designed to save time.",
-      bgColor: "bg-indigo-600",
-    },
-    {
-      icon: <RotateCcw className="w-6 h-6 text-white" />,
-      title: "Smooth Sync",
-      description:
-        "Connect your team across departments in one seamless flow in real time.",
-      bgColor: "bg-pink-500",
+        "Start fast with ready-made templates or save your own for future use. Browse, preview, and remix public diagrams.",
+      bgColor: "bg-emerald-500",
     },
     {
       icon: <FileText className="w-6 h-6 text-white" />,
-      title: "Taskly",
+      title: "Flexible Export & Import",
       description:
-        "Eliminate manual work with powerful automation tools that handle the busywork.",
+        "Export diagrams as PNG, HTML, or .fz files. Import and edit any saved diagram with a click.",
       bgColor: "bg-yellow-500",
+    },
+    {
+      icon: <Share2 className="w-6 h-6 text-white" />,
+      title: "Easy Sharing & Management",
+      description:
+        "Save diagrams to the cloud, manage access, and share with a link. Control who can view or edit.",
+      bgColor: "bg-pink-500",
+    },
+    {
+      icon: <Zap className="w-6 h-6 text-white" />,
+      title: "Intuitive & Fast UI",
+      description:
+        "Drag, drop, connect, and edit with a Figma-like interface. Undo/redo, search, and autosave built in.",
+      bgColor: "bg-purple-500",
     },
   ];
 
@@ -49,16 +51,14 @@ const BenefitsSection = () => {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
           <span className="text-gray-500 text-sm font-medium uppercase tracking-wide">
-            Benefits
+            Why Flowz?
           </span>
           <h2 className="text-5xl font-bold text-gray-900 mt-4 mb-6">
-            Rapidly create high-
-            <br />
-            performance workflows
-          </h2>{" "}
+            The Future of Diagramming is Here
+          </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            AutoMesh&apos;s got you covered with simple tools to supercharge
-            your workflows, no matter your team&apos;s size.
+            Flowz combines AI, real-time collaboration, and a beautiful UI to
+            help you create, share, and manage diagrams faster than ever.
           </p>
         </div>
 

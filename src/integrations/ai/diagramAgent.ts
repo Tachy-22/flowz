@@ -77,6 +77,7 @@ Create visual flow diagrams by generating JSON data that represents nodes and co
 3. **ALWAYS provide both chat response AND JSON diagram data**
 4. **Use the JSON format exactly as specified below**
 5. **NEVER say 'Here is the JSON data' or mention JSON, code, or technical details to the user. Only refer to 'your diagram' or 'the diagram'.**
+6. **If the current diagram's description is a URL (starts with 'http'), you MUST always create a new diagram with a new title and a new, non-URL description. Never reuse the description or title from a template.**
 
 ## Current Capabilities:
 - **Multiple shape types**: rectangle, circle, diamond, triangle, text
@@ -167,7 +168,7 @@ Remember: Always include both a helpful chat response AND diagram JSON when crea
       ];
 
       this.chat = createChat(defaultHistory);
-      console.log("✅ Diagram agent initialized");
+     // console.log("✅ Diagram agent initialized");
     } catch (error) {
       console.error("❌ Failed to initialize diagram agent:", error);
     }
@@ -201,7 +202,7 @@ User request: ${request.prompt}`;
         contextPrompt = contextInfo;
       }
 
-      console.log("🤖 Sending request to diagram agent:", contextPrompt);
+      // console.log("🤖 Sending request to diagram agent:", contextPrompt);
 
       // Get AI response
       let fullResponse = "";
@@ -209,10 +210,10 @@ User request: ${request.prompt}`;
         fullResponse = chunk;
       }
 
-      console.log(
-        "📝 Agent response received:",
-        fullResponse.substring(0, 200) + "..."
-      );
+      // console.log(
+      //   "📝 Agent response received:",
+      //   fullResponse.substring(0, 200) + "..."
+      // );
 
       // Parse diagram data from response
       const diagramData = this.extractDiagramData(fullResponse);
@@ -269,10 +270,10 @@ User request: ${request.prompt}`;
 
         contextPrompt = contextInfo;
       }
-      console.log(
-        "🤖 Starting streaming request to diagram agent:",
-        contextPrompt
-      );
+      // console.log(
+      //   "🤖 Starting streaming request to diagram agent:",
+      //   contextPrompt
+      // );
 
       let fullResponse = "";
       let lastYieldTime = 0;
@@ -280,7 +281,7 @@ User request: ${request.prompt}`;
 
       for await (const chunk of sendMessageStream(this.chat, contextPrompt)) {
         fullResponse += chunk; // Accumulate individual chunks
-        console.log("📝 Streaming chunk received:", chunk);
+       // console.log("📝 Streaming chunk received:", chunk);
 
         // Throttle yielding to prevent too frequent updates
         const now = Date.now();
@@ -303,7 +304,7 @@ User request: ${request.prompt}`;
         isComplete: true,
       };
 
-      console.log("✅ Streaming completed with diagram data:", !!diagramData);
+      //console.log("✅ Streaming completed with diagram data:", !!diagramData);
     } catch (error) {
       console.error("❌ Diagram agent streaming error:", error);
       yield {
@@ -328,14 +329,14 @@ User request: ${request.prompt}`;
         matches.push(match[1]);
       }
       if (matches.length === 0) {
-        console.log("💭 No diagram JSON found in response");
+        //console.log("💭 No diagram JSON found in response");
         return undefined;
       }
 
       const jsonStr = matches[0];
       const parsed = JSON.parse(jsonStr) as ParsedDiagramData;
 
-      console.log("📊 Extracted diagram data:", parsed);
+   //   console.log("📊 Extracted diagram data:", parsed);
 
       // Validate the structure
       if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
@@ -354,9 +355,9 @@ User request: ${request.prompt}`;
             y: Math.max(position.y, 50), // Ensure minimum y of 50
           };
 
-          console.log(
-            `🔧 Node ${rawNode.id}: Original position (${position.x}, ${position.y}) → Safe position (${safePosition.x}, ${safePosition.y})`
-          );
+          // console.log(
+          //   `🔧 Node ${rawNode.id}: Original position (${position.x}, ${position.y}) → Safe position (${safePosition.x}, ${safePosition.y})`
+          // );
 
           return {
             id: rawNode.id || `node-${Date.now()}-${index}`,
@@ -394,11 +395,18 @@ User request: ${request.prompt}`;
         }
       );
 
+      // Post-process: If description is a URL, force a new, non-URL description
+      let description = parsed.description;
+      if (description && /^https?:\/\//.test(description)) {
+        description =
+          "AI generated diagram (template used, description replaced)";
+      }
+
       return {
         nodes: validatedNodes,
         edges: validatedEdges,
         title: parsed.title || "AI Generated Diagram",
-        description: parsed.description,
+        description,
         action: parsed.action,
       };
     } catch (error) {
@@ -408,7 +416,7 @@ User request: ${request.prompt}`;
   }
   // Reset the agent's conversation
   resetAgent() {
-    console.log("🔄 Resetting diagram agent...");
+   // console.log("🔄 Resetting diagram agent...");
     this.initializeAgent();
   }
 
@@ -420,9 +428,9 @@ User request: ${request.prompt}`;
     }
 
     // Add a strong reminder message to the chat
-    const reminderMessage = `REMINDER: You are Flowz AI, a diagram creation specialist. When users ask for any type of diagram, flowchart, or visual representation, you MUST create the diagram JSON. Do not provide text descriptions - create actual visual diagrams.`;
+   // const reminderMessage = `REMINDER: You are Flowz AI, a diagram creation specialist. When users ask for any type of diagram, flowchart, or visual representation, you MUST create the diagram JSON. Do not provide text descriptions - create actual visual diagrams.`;
 
-    console.log("🔧 Activating diagram creation mode", reminderMessage);
+    //console.log("🔧 Activating diagram creation mode", reminderMessage);
     // This doesn't need to be awaited, just sets the context
   }
 }

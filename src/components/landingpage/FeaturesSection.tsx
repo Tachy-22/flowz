@@ -1,21 +1,47 @@
 "use client";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import {
+  Sparkles,
+  Users,
+  Shapes,
+  Download,
+  FolderOpen,
+  Settings2,
+} from "lucide-react";
+
+const features = [
+  {
+    title: "Gemini AI Chat & Generation",
+    desc: "Describe your flow in plain English and let Gemini AI build it for you. Get instant suggestions, auto-layout, and smart edits—all in real time.",
+    icon: <Sparkles className="w-8 h-8 text-indigo-600 mb-4" />,
+  },
+  {
+    title: "Real-Time Collaboration",
+    desc: "Invite teammates to edit diagrams together. See changes live, chat, and never lose track of updates.",
+    icon: <Users className="w-8 h-8 text-blue-600 mb-4" />,
+  },
+  {
+    title: "Template Library",
+    desc: "Browse, preview, and use public templates. Save your own diagrams as templates for quick reuse.",
+    icon: <FolderOpen className="w-8 h-8 text-emerald-600 mb-4" />,
+  },
+  {
+    title: "Flexible Export & Import",
+    desc: "Export diagrams as PNG, HTML, or .fz files. Import and edit any saved diagram instantly.",
+    icon: <Download className="w-8 h-8 text-yellow-500 mb-4" />,
+  },
+  {
+    title: "Advanced Diagramming",
+    desc: "Draw rectangles, circles, diamonds, triangles, text, and freehand shapes. Connect nodes with smart arrows and edit everything inline.",
+    icon: <Shapes className="w-8 h-8 text-purple-500 mb-4" />,
+  },
+  {
+    title: "Diagram Management",
+    desc: "Search, autosave, undo/redo, and manage all your diagrams in one place. Share with a link and control access.",
+    icon: <Settings2 className="w-8 h-8 text-pink-500 mb-4" />,
+  },
+];
 
 const FeaturesSection = () => {
-  const [activeTab, setActiveTab] = useState("AI Automation");
-
-  const categories = [
-    "AI Automation",
-    "Lead Management",
-    "Sales",
-    "Marketing",
-    "Support",
-    "Finance",
-    "HR",
-  ];
-
   return (
     <section className="py-20 px-6">
       <div className="max-w-6xl mx-auto">
@@ -24,150 +50,33 @@ const FeaturesSection = () => {
             Features
           </span>
           <h2 className="text-5xl font-bold text-gray-900 mt-4 mb-6">
-            Save time and effort by using our
-            <br />
-            pre-designed templates
+            Everything You Need to Build, Share, and Automate Diagrams
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Boost efficiency with ready-to-use templates, streamlining tasks,
-            reducing errors, and accelerating workflow automation effortlessly.
+            Flowz brings together AI, collaboration, and a powerful canvas to
+            help you create diagrams faster and smarter.
           </p>
         </div>
-
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
-          {categories.map((category) => (
-            <button
-              key={category}
-              onClick={() => setActiveTab(category)}
-              className={`px-6 py-3 rounded-full text-sm font-medium transition-colors ${
-                activeTab === category
-                  ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {features.map((feature, idx: number) => (
+            <div
+              key={idx}
+              className="relative bg-gradient-to-br from-indigo-50 via-white to-indigo-100 rounded-3xl shadow-xl border border-indigo-100 px-8 py-10 flex flex-col items-center text-center hover:shadow-2xl transition-all duration-300"
             >
-              {category}
-            </button>
+              <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 shadow-inner border-2 border-indigo-200">
+                {feature.icon}
+              </div>
+              <h3 className="font-bold text-2xl text-gray-900 mb-3 tracking-tight drop-shadow-sm">
+                {feature.title}
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed max-w-md mx-auto">
+                {feature.desc}
+              </p>
+              {/* Decorative gradient blur */}
+              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-200 opacity-30 rounded-full blur-2xl z-0" />
+              <div className="absolute -top-10 -left-10 w-24 h-24 bg-indigo-100 opacity-20 rounded-full blur-xl z-0" />
+            </div>
           ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-indigo-500">
-              <h3 className="font-semibold text-gray-900 mb-2">Inbox Email</h3>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <div className="h-2 bg-gray-200 rounded flex-1"></div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <div className="h-2 bg-gray-200 rounded flex-1"></div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <div className="h-2 bg-gray-200 rounded flex-1"></div>
-                </div>
-              </div>
-              <Button className="bg-indigo-600 text-white text-xs px-4 py-1 rounded mt-4">
-                Custom
-              </Button>
-            </div>
-
-            <div className="text-left">
-              <h4 className="text-xl font-semibold text-gray-900 mb-3">
-                Craft personalized email responses
-                <br />
-                for customers effortlessly.
-              </h4>
-              <a
-                href="#"
-                className="inline-flex items-center text-gray-900 font-medium hover:text-indigo-600"
-              >
-                Learn more about <ArrowRight className="ml-2 w-4 h-4" />
-              </a>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm text-center">
-              <div className="flex justify-center space-x-4 mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg"></div>
-                <div className="w-10 h-10 bg-orange-100 rounded-lg"></div>
-                <div className="w-10 h-10 bg-blue-500 rounded-lg"></div>
-              </div>
-              <Button className="bg-indigo-600 text-white px-6 py-2 rounded-lg">
-                Generate
-              </Button>
-              <div className="mt-4 text-xs text-gray-500">analyzing...</div>
-            </div>
-
-            <div className="text-left">
-              <h4 className="text-xl font-semibold text-gray-900 mb-3">
-                Generate sales call summaries with
-                <br />
-                AI-powered insights.
-              </h4>
-              <a
-                href="#"
-                className="inline-flex items-center text-gray-900 font-medium hover:text-indigo-600"
-              >
-                Learn more about <ArrowRight className="ml-2 w-4 h-4" />
-              </a>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-sm font-medium">Chatbot</span>
-                <button className="p-1">
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" />
-                  </svg>
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-6 h-6 bg-indigo-500 rounded-full"></div>
-                  <div className="h-2 bg-gray-200 rounded flex-1"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-6 h-6 bg-indigo-500 rounded-full"></div>
-                  <div className="h-2 bg-gray-200 rounded flex-1"></div>
-                </div>
-                <div className="flex justify-end">
-                  <div className="w-6 h-6 bg-gray-300 rounded-full"></div>
-                </div>
-              </div>
-              <button className="mt-4 p-2 bg-gray-100 rounded">
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="text-left">
-              <h4 className="text-xl font-semibold text-gray-900 mb-3">
-                Engage leads around the clock with
-                <br />
-                an intelligent sales chatbot.
-              </h4>
-              <a
-                href="#"
-                className="inline-flex items-center text-gray-900 font-medium hover:text-indigo-600"
-              >
-                Learn more about <ArrowRight className="ml-2 w-4 h-4" />
-              </a>
-            </div>
-          </div>
         </div>
       </div>
     </section>

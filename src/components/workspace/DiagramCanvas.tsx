@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactFlow, {
   Node,
   addEdge,
@@ -71,7 +71,7 @@ const DeletableEdge: React.FC<DeletableEdgeProps> = ({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       setEdges((edges) => edges.filter((edge) => edge.id !== id));
-      console.log("🗑️ Deleted edge:", id);
+      ////console.log("🗑️ Deleted edge:", id);
     },
     [setEdges, id]
   );
@@ -266,6 +266,11 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
     endConnection,
     shouldAddDraw,
     resetAddDrawFlag,
+    // Animation handoff
+    pendingDiagramToAnimate,
+    setPendingDiagramToAnimate,
+
+    setDiagramTitle,
   } = useDiagramStore();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project, fitView } = useReactFlow();
@@ -280,7 +285,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
 
   React.useEffect(() => {
     if (nodes.length > 0 || edges.length > 0) {
-      console.log("🔄 Initial sync from Zustand to React Flow");
+      ////console.log("🔄 Initial sync from Zustand to React Flow");
 
       const mappedNodes = nodes.map((node) => {
         const mappedNode: Node = {
@@ -316,7 +321,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
 
       setFlowNodes(mappedNodes);
       setFlowEdges(mappedEdges);
-      console.log("✅ Initial React Flow setup complete");
+      ////console.log("✅ Initial React Flow setup complete");
     }
     // Only run once on mount, don't include state dependencies
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,16 +351,16 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       diagramIdChanged || isSignificantChange || edgeCountChanged;
 
     if (shouldSync) {
-      console.log("🔄 Syncing from Zustand to React Flow");
-      console.log("📊 Zustand nodes:", nodes.length, "edges:", edges.length);
-      console.log(
-        "🔗 Edge count changed:",
-        edgeCountChanged,
-        "from",
-        prevEdgesLength.current,
-        "to",
-        edges.length
-      );
+      ////console.log("🔄 Syncing from Zustand to React Flow");
+      ////console.log("📊 Zustand nodes:", nodes.length, "edges:", edges.length);
+      // //console.log(
+      //   "🔗 Edge count changed:",
+      //   edgeCountChanged,
+      //   "from",
+      //   prevEdgesLength.current,
+      //   "to",
+      //   edges.length
+      // );
 
       isLoadingDiagram.current = true; // Set flag to prevent sync back
 
@@ -382,21 +387,21 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
 
       setFlowNodes(mappedNodes);
       setFlowEdges(mappedEdges);
-      console.log(
-        "✅ Synced to React Flow - Nodes:",
-        mappedNodes.length,
-        "Edges:",
-        mappedEdges.length
-      );
+      // //console.log(
+      //   "✅ Synced to React Flow - Nodes:",
+      //   mappedNodes.length,
+      //   "Edges:",
+      //   mappedEdges.length
+      // );
 
       // Fit the view to show all nodes after a short delay (only for diagram loads)
       if (diagramIdChanged && (nodes.length > 0 || edges.length > 0)) {
         setTimeout(() => {
           try {
             fitView({ duration: 200, padding: 0.1 });
-            console.log("🔍 Fitted view to show all nodes");
+            //console.log("🔍 Fitted view to show all nodes");
           } catch (error) {
-            console.log("⚠️ fitView failed:", error);
+            console.error("⚠️ fitView failed:", error);
           }
         }, 100);
       }
@@ -409,15 +414,47 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       // Reset the flag after a longer delay to ensure sync is complete
       setTimeout(() => {
         isLoadingDiagram.current = false;
-        console.log("🔓 Loading flag reset - sync enabled");
+        //console.log("🔓 Loading flag reset - sync enabled");
       }, 200);
     }
-  }, [nodes, edges, setFlowNodes, setFlowEdges, fitView]); // Sync React Flow state back to Zustand with debouncing to prevent infinite loops
+  }, [nodes, edges, setFlowNodes, setFlowEdges, fitView]); // --- Real-time sync: Zustand → React Flow (for streaming AI updates) ---
+  React.useEffect(() => {
+    // Always update React Flow state when Zustand nodes/edges change
+    const mappedNodes = nodes.map((node) => {
+      const mappedNode: Node = {
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        data: node.data,
+        draggable: true,
+        selectable: true,
+      };
+      if (node.width) mappedNode.width = node.width;
+      if (node.height) mappedNode.height = node.height;
+      return mappedNode;
+    });
+    const mappedEdges = edges.map((edge) => {
+      const mappedEdge: Edge = {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        data: edge.data,
+      };
+      if (edge.sourceHandle) mappedEdge.sourceHandle = edge.sourceHandle;
+      if (edge.targetHandle) mappedEdge.targetHandle = edge.targetHandle;
+      return mappedEdge;
+    });
+    setFlowNodes(mappedNodes);
+    setFlowEdges(mappedEdges);
+  }, [nodes, edges]);
+
+  // Sync React Flow state back to Zustand with debouncing to prevent infinite loops
   const syncTimeoutRef = useRef<NodeJS.Timeout>();
   React.useEffect(() => {
     // Don't sync if we're in the middle of loading a diagram from Zustand
     if (isLoadingDiagram.current) {
-      console.log("🔒 Skipping sync - diagram is loading");
+      //console.log("🔒 Skipping sync - diagram is loading");
       return;
     }
 
@@ -431,12 +468,12 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
 
     // Debounce the sync to prevent infinite loops
     syncTimeoutRef.current = setTimeout(() => {
-      console.log(
-        "🔄 Syncing React Flow to Zustand - Nodes:",
-        flowNodes.length,
-        "Edges:",
-        flowEdges.length
-      );
+      //console.log(
+      //   "🔄 Syncing React Flow to Zustand - Nodes:",
+      //   flowNodes.length,
+      //   "Edges:",
+      //   flowEdges.length
+      // );
       const convertedNodes = flowNodes.map((node) => {
         const convertedNode: DiagramNode = {
           id: node.id,
@@ -471,7 +508,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       setNodes(convertedNodes);
       setEdges(convertedEdges);
 
-      console.log("✅ Zustand updated from React Flow state");
+      ///console.log("✅ Zustand updated from React Flow state");
     }, 150); // Increased debounce time for more stability
 
     return () => {
@@ -495,7 +532,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         );
         setSelectedNodeId(null);
 
-        console.log("🗑️ Deleted node via Delete key:", selectedNodeId);
+        ///console.log("🗑️ Deleted node via Delete key:", selectedNodeId);
       }
     };
 
@@ -513,7 +550,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       // Cancel connection if clicking on pane
       if (activeTool === "connection" && isConnecting) {
         endConnection();
-        console.log("🔗 Connection cancelled");
+        //console.log("🔗 Connection cancelled");
         return;
       }
       // Text tool drawing
@@ -643,7 +680,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         if (newNode) {
           setFlowNodes((nodes) => [...nodes, newNode]);
           setSelectedNodeId(newNode.id);
-          console.log("✅ text node created successfully");
+          ////console.log("✅ text node created successfully");
         }
         resetAddTextFlag();
         setActiveTool("select");
@@ -657,7 +694,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         if (newNode) {
           setFlowNodes((nodes) => [...nodes, newNode]);
           setSelectedNodeId(newNode.id);
-          console.log("✅ draw node created successfully");
+          ////console.log("✅ draw node created successfully");
         }
         resetAddDrawFlag();
         setActiveTool("select");
@@ -672,7 +709,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         if (newNode) {
           setFlowNodes((nodes) => [...nodes, newNode]);
           setSelectedNodeId(newNode.id);
-          console.log(`✅ ${activeTool} created successfully`);
+          ////console.log(`✅ ${activeTool} created successfully`);
         }
         resetAddRectangleFlag();
         setActiveTool("select");
@@ -736,12 +773,69 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
       setSelectedEdgeId(null); // Also deselect edges
     }
   }, [shouldAddRectangle, setSelectedNodeId, setSelectedEdgeId]);
+  // Animate diagram build-up when pendingDiagramToAnimate is set
+  useEffect(() => {
+    if (!pendingDiagramToAnimate) return;
+    let cancelled = false;
+    async function animate() {
+      if (!pendingDiagramToAnimate) return;
+      // Clear the canvas first
+      setFlowNodes([]);
+      setFlowEdges([]);
+      // Animate nodes
+      for (let i = 0; i < pendingDiagramToAnimate.nodes.length; i++) {
+        if (cancelled) return;
+        setFlowNodes(pendingDiagramToAnimate.nodes.slice(0, i + 1));
+        setFlowEdges([]);
+        await new Promise((res) => setTimeout(res, 180));
+      }
+      // Animate edges (after all nodes are in)
+      for (let j = 0; j < pendingDiagramToAnimate.edges.length; j++) {
+        if (cancelled) return;
+        setFlowNodes(pendingDiagramToAnimate.nodes);
+        setFlowEdges(pendingDiagramToAnimate.edges.slice(0, j + 1));
+        await new Promise((res) => setTimeout(res, 120));
+      }
+      // After animation, set the full diagram as current
+      setNodes(pendingDiagramToAnimate.nodes);
+      setEdges(pendingDiagramToAnimate.edges);
+      setDiagramTitle(pendingDiagramToAnimate.title);
+      setPendingDiagramToAnimate(null);
+    }
+    animate();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDiagramToAnimate]);
+
+  // --- Loading overlay for AI diagram animation ---
+  const isAnimatingDiagram = !!pendingDiagramToAnimate;
+
   return (
     <div
       className={`h-full w-full bg-gray-50 relative ${className}`}
       ref={reactFlowWrapper}
     >
-      {" "}
+      {/* Loading overlay for AI animation */}
+      {isAnimatingDiagram && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-100/60 pointer-events-none">
+          <div className="flex flex-col items-center gap-2">
+            <div className="loader">
+              <div className="react-star">
+                <div className="nucleus"></div>
+                <div className="electron electron1"></div>
+                <div className="electron electron2"></div>
+                <div className="electron electron3"></div>
+              </div>
+              <span className="text-black absolute bottom-0  translate-y-[4rem] translate-x-[0rem] scale-[140%]">
+                {" "}
+                Generating...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       <ReactFlow
         nodes={flowNodes.map((node) => ({
           ...node,
@@ -799,7 +893,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ className = "" }) => {
         }}
       >
         {" "}
-        <Background  />{" "}
+        <Background />{" "}
         {/* <Controls />
         <MiniMap /> */}{" "}
         {/* Drawing Preview Overlay - positioned using screen coordinates */}

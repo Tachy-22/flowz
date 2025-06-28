@@ -23,7 +23,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-indigo-600" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">
-            Checking authentication...
+            Loading...
           </h1>
           <p className="text-gray-600">Please wait a moment</p>
         </div>
@@ -48,7 +48,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // User is authenticated, render children
-  console.log("✅ User authenticated, rendering protected content");
+//  console.log("✅ User authenticated, rendering protected content");
   return <>{children}</>;
 };
 

@@ -46,18 +46,37 @@ const WorkspaceIndex: React.FC = () => {
     setLoading(true);
     try {
       if (diagramId) {
-        // Update existing diagram
-        await diagramService.updateDiagramContent(diagramId, nodes, edges);
-        console.log("✅ Diagram updated successfully!");
+        // Check if the current diagram's allowedUsers is ["all"]
+        const currentDiagram = await diagramService.getDiagram(diagramId);
+        if (
+          currentDiagram &&
+          Array.isArray(currentDiagram.allowedUsers) &&
+          currentDiagram.allowedUsers.length === 1 &&
+          currentDiagram.allowedUsers[0] === "all"
+        ) {
+          // Create a new diagram for this user only
+          const newDiagramId = await diagramService.createDiagram(user.uid, {
+            title: diagramTitle || "My Diagram",
+            nodes,
+            edges,
+          });
+          setDiagramId(newDiagramId);
+          //console.log("✅ New diagram created for user from template!");
+        } else {
+          // Update existing diagram
+          await diagramService.updateDiagramContent(diagramId, nodes, edges);
+          //console.log("✅ Diagram updated successfully!");
+        }
       } else {
         // Create new diagram
         const newDiagramId = await diagramService.createDiagram(user.uid, {
           title: diagramTitle || "My Diagram",
           nodes,
           edges,
+         // allowedUsers: [user.uid],
         });
         setDiagramId(newDiagramId);
-        console.log("✅ New diagram created successfully!");
+        //console.log("✅ New diagram created successfully!");
       }
     } catch (error) {
       console.error("❌ Failed to save diagram:", error);
@@ -79,7 +98,7 @@ const WorkspaceIndex: React.FC = () => {
         if (diagramId) {
           // Update existing diagram title
           await diagramService.updateDiagram(diagramId, { title: newTitle });
-          console.log("✅ Diagram title updated successfully!");
+          //console.log("✅ Diagram title updated successfully!");
         } else {
           // Create new diagram with the title
           const newDiagramId = await diagramService.createDiagram(user.uid, {
@@ -88,7 +107,7 @@ const WorkspaceIndex: React.FC = () => {
             edges,
           });
           setDiagramId(newDiagramId);
-          console.log("✅ New diagram created with title!");
+          //console.log("✅ New diagram created with title!");
         }
       } catch (error) {
         console.error("❌ Failed to update diagram title:", error);
@@ -101,66 +120,71 @@ const WorkspaceIndex: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-    <ReactFlowProvider>      {/* Top Toolbar */}
-      <TopToolbar
-        user={user}
-        onSignOut={handleSignOut}
-        onToggleTools={() => setIsToolsSidebarOpen(!isToolsSidebarOpen)}
-        onToggleChat={() => setIsChatOpen(!isChatOpen)}
-        isToolsSidebarOpen={isToolsSidebarOpen}
-        isChatOpen={isChatOpen}
-        onSave={handleSave}
-        onUpdateTitle={handleUpdateTitle}
-      />{" "}
-      {/* Main Workspace */}
-      <div className="flex-1 overflow-hidden">
-        <div className="flex h-full">
-          {/* Left Sidebar - Tools (Fixed Width) */}
-          {isToolsSidebarOpen && (
-            <div className="w-64 bg-white border-r border-gray-200 flex-shrink-0">
-              <ToolsSidebar onClose={() => setIsToolsSidebarOpen(false)} />
+      <ReactFlowProvider>
+        {" "}
+        {/* Top Toolbar */}
+        <TopToolbar
+          user={user}
+          onSignOut={handleSignOut}
+          onToggleTools={() => setIsToolsSidebarOpen(!isToolsSidebarOpen)}
+          onToggleChat={() => setIsChatOpen(!isChatOpen)}
+          isToolsSidebarOpen={isToolsSidebarOpen}
+          isChatOpen={isChatOpen}
+          onSave={handleSave}
+          onUpdateTitle={handleUpdateTitle}
+        />{" "}
+        {/* Main Workspace */}
+        <div className="flex-1 overflow-hidden">
+          <div className="flex h-full">
+            {/* Left Sidebar - Tools (Fixed Width) */}
+            {isToolsSidebarOpen && (
+              <div className="w-64 bg-white border-r border-gray-200 flex-shrink-0">
+                <ToolsSidebar onClose={() => setIsToolsSidebarOpen(false)} />
+              </div>
+            )}
+
+            {/* Main Content Area with Resizable Chat */}
+            <div className="flex-1 overflow-hidden">
+              <ResizablePanelGroup direction="horizontal" className="h-full">
+                {/* Main Canvas Area */}
+                <ResizablePanel
+                  defaultSize={isChatOpen ? 70 : 100}
+                  minSize={50}
+                >
+                  <DiagramCanvas />
+                </ResizablePanel>
+
+                {/* Right Sidebar - AI Chat (Resizable) */}
+                {isChatOpen && (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+                      <div className="h-full bg-white border-l border-gray-200 flex flex-col">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                          <h3 className="font-medium text-gray-900">
+                            AI Assistant
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsChatOpen(false)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex-1 overflow-hidden p-4">
+                          <GeminiChat />
+                        </div>
+                      </div>
+                    </ResizablePanel>
+                  </>
+                )}
+              </ResizablePanelGroup>
             </div>
-          )}
-
-          {/* Main Content Area with Resizable Chat */}
-          <div className="flex-1 overflow-hidden">
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              {/* Main Canvas Area */}
-              <ResizablePanel defaultSize={isChatOpen ? 70 : 100} minSize={50}>
-                <DiagramCanvas />
-              </ResizablePanel>
-
-              {/* Right Sidebar - AI Chat (Resizable) */}
-              {isChatOpen && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-                    <div className="h-full bg-white border-l border-gray-200 flex flex-col">
-                      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                        <h3 className="font-medium text-gray-900">
-                          AI Assistant
-                        </h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsChatOpen(false)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex-1 overflow-hidden p-4">
-                        <GeminiChat />
-                      </div>
-                    </div>
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
           </div>
         </div>
-      </div>
-        </ReactFlowProvider>
+      </ReactFlowProvider>
     </div>
   );
 };
