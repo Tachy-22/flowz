@@ -313,7 +313,7 @@ const GeminiChat: React.FC = () => {
                 className={`flex gap-3 items-start  ${
                   message.role === "user"
                     ? "flex-row-reverse  w-full "
-                    : "justify-end"
+                    : ""
                 }`}
               >
                 <div
